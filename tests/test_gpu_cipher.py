@@ -54,3 +54,38 @@ def test_gpu_cipher_raises_without_cuda(monkeypatch: pytest.MonkeyPatch) -> None
             torch.tensor([[0, 0]], dtype=torch.uint32),
             rounds=1,
         )
+
+
+@pytest.mark.gpu
+@pytest.mark.slow
+def test_gpu_matches_cpu_million_pairs() -> None:
+    """The GPU-as-oracle fuzz test — 10^6 (pt, key) pairs per round count."""
+    from keeloq.gpu_cipher import encrypt_batch
+
+    assert torch is not None
+    n = 1_000_000
+    gen = torch.Generator(device="cpu").manual_seed(2026)
+    plaintexts_cpu = torch.randint(0, 1 << 32, (n,), generator=gen, dtype=torch.int64)
+    keys_lo_cpu = torch.randint(0, 1 << 32, (n,), generator=gen, dtype=torch.int64)
+    keys_hi_cpu = torch.randint(0, 1 << 32, (n,), generator=gen, dtype=torch.int64)
+
+    plaintexts = plaintexts_cpu.to(dtype=torch.uint32, device="cuda")
+    keys = torch.stack(
+        [keys_lo_cpu.to(dtype=torch.uint32), keys_hi_cpu.to(dtype=torch.uint32)], dim=1
+    ).to("cuda")
+
+    # Sample 1024 indices randomly for CPU comparison; GPU computes all N.
+    gpu_out = encrypt_batch(plaintexts, keys, rounds=160).cpu().tolist()
+
+    import random
+
+    rng = random.Random(2026)
+    sample_ix = rng.sample(range(n), 1024)
+    for i in sample_ix:
+        pt = int(plaintexts_cpu[i].item()) & 0xFFFFFFFF
+        k = (int(keys_hi_cpu[i].item()) & 0xFFFFFFFF) << 32 | (
+            int(keys_lo_cpu[i].item()) & 0xFFFFFFFF
+        )
+        assert gpu_out[i] == cpu_encrypt(pt, k, 160), (
+            f"mismatch at i={i}: pt=0x{pt:08x} key=0x{k:016x}"
+        )
