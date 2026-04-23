@@ -1,7 +1,7 @@
 """End-to-end key-recovery pipeline: anf -> encode -> solve -> verify."""
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Literal
 
@@ -22,7 +22,7 @@ class AttackResult:
     solver_used: str
 
 
-EncodeFn = Callable[[Sequence[BoolPoly]], SolverInstance]
+EncodeFn = Callable[[list[BoolPoly]], SolverInstance]
 SolveFn = Callable[[SolverInstance, float], SolveResult]
 
 
@@ -61,11 +61,16 @@ def attack(
 
 
 def _extract_key(assignment: dict[str, int]) -> int:
+    """Extract the 64-bit key from the solver assignment.
+
+    Key bits not present in the assignment are unconstrained free variables;
+    the solver may omit them.  We arbitrarily fix them to 0, which is a valid
+    choice in the SAT solution.  The caller's verify step confirms that the
+    resulting key is consistent with every plaintext/ciphertext pair.
+    """
     key = 0
     for i in range(64):
-        bit = assignment.get(f"K{i}")
-        if bit is None:
-            raise VerificationError(f"K{i} missing from solver assignment")
+        bit = assignment.get(f"K{i}", 0)  # 0 is a valid value for a free variable
         if bit not in (0, 1):
             raise VerificationError(f"K{i}={bit} is not a bit")
         key = (key << 1) | bit
