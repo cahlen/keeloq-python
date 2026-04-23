@@ -10,17 +10,28 @@ The Gohr-style depth-5 width-512 ResNet-1D-CNN architecture has a **learnable-si
 
 ## Empirical findings
 
-We trained tiny distinguishers (200 000 samples × 2 epochs) on every Hamming-weight-1 difference plus every HW2 tap-position pair (~52 candidates total) at each of three depths, and recorded validation accuracy:
+We trained tiny distinguishers (100 000–200 000 samples × 2 epochs) on every Hamming-weight-1 difference plus every HW2 tap-position pair (~52 candidates total) at each tested depth, and recorded validation accuracy:
 
 | Trained depth | Best Δ | Best val-acc | Top-5 val-acc range | Status |
 |---:|---|---:|---|---|
 | 56  | `0x00000002` | 0.6876 | 0.63 – 0.69 | Signal |
+| 57  | `0x01000000` | 0.5386 | 0.50 – 0.54 | Boundary |
+| 58  | `0x00800000` | 0.5340 | 0.50 – 0.53 | Collapse |
+| 59  | `0x02000000` | 0.5344 | 0.50 – 0.53 | Collapse |
+| 60  | `0x00800000` | 0.5282 | 0.50 – 0.53 | Collapse |
+| 64  | various | 0.5110 | 0.50 – 0.51 | Collapse |
+| 68  | various | 0.5088 | 0.49 – 0.51 | Collapse |
+| 72  | various | 0.5016 | 0.49 – 0.50 | Collapse |
+| 76  | various | 0.5150 | 0.50 – 0.52 | Collapse |
+| 80  | various | 0.5052 | 0.49 – 0.51 | Collapse |
 | 88  | `0x00000200` | 0.5166 | 0.507 – 0.517 | Collapse |
 | 120 | `0x00010000` | 0.5142 | 0.511 – 0.514 | Collapse |
 
-For reference, the 95% confidence interval for pure chance on a 5 000-sample balanced validation split is 0.500 ± 0.014. The depth-88 and depth-120 best candidates are within 1.2 σ of noise — statistically indistinguishable from a coin flip.
+For reference, the 95% confidence interval for pure chance on a 5 000-sample balanced validation split is 0.500 ± 0.014. Everything from depth 57 onwards sits within 2–3 σ of noise.
 
-Full Δ rankings at each depth are in [`delta_search.md`](delta_search.md).
+**Key finding: the cliff is one round wide.** Signal decays from 0.69 at depth 56 to 0.54 at depth 57 to 0.53 at depth 58 — a near-step-function transition. KeeLoq's round function applied a single additional time after depth 56 apparently takes the residual differential feature below what this model family can learn. By depth 60 all candidate Δs are pure noise, and depths 60 through 120 behave identically.
+
+Full Δ rankings at depths 56 / 88 / 120 (v1 architecture) are in [`delta_search.md`](delta_search.md); the broad depth sweep (60–80) is in [`horizon_probe.md`](horizon_probe.md); the fine probe (57–59) is in [`horizon_probe_fine.md`](horizon_probe_fine.md); the alternate-architecture (v2 spatial-conv) replication is in [`v2_experiment.md`](v2_experiment.md).
 
 We also ran a full-scale training run at depth 88 with `Δ=0x00000002` (10 M samples × 20 epochs, 68 minutes wall clock on an RTX 5090). Result: `final_val_accuracy = 0.5000`, `final_loss = 0.6931` (= ln 2, pure chance BCE). The resulting model predicts class 1 for every input (confusion matrix `[0, 500000, 0, 500000]`) — classic mode collapse. The training log is preserved in [`train_d96.json`](train_d96.json) for the record; the collapsed checkpoint itself is not preserved (it contains no useful information).
 
@@ -36,11 +47,10 @@ The sharp transition between depth 56 (clear signal across ~40 candidate Δs) an
 ## Concrete impact on the Phase 3b pipeline
 
 - **d64.pt (depth 56)**: keeps working. Gohr-pattern hybrid attack at 64 rounds / 8 neural bits + SAT suffix recovers a 64-bit key in 1.6 seconds via the regression test.
-- **d96.pt (depth 88)**: not produced. Training always collapses for this architecture.
-- **d128.pt (depth 120)**: not produced. Same reason.
-- **128-round ambition attack**: not attempted. Would require a viable d128.pt.
+- **d72, d80, d88, d96, d128**: none produced. Every trained depth ≥ 57 tested to date collapses to chance-level accuracy.
+- **Maximum viable trained depth with this architecture and data budget: 56.** The horizon probe walked depth 57 through depth 80 and found no viable cell; the broader depth sweep at 88 and 120 confirms the same pattern continues. d64.pt (trained at depth 56, peel K=8, attack at 64 rounds) is *definitionally* the deepest useful checkpoint until one of the "push the frontier" directions below lands.
 
-The `keeloq neural recover-key` CLI and `hybrid_attack()` pipeline are unchanged and remain correct; they just require a distinguisher that actually discriminates. For round counts ≥ 88 with the current architecture, the pipeline will return `BACKTRACK_EXHAUSTED` or equivalent terminal statuses.
+The `keeloq neural recover-key` CLI and `hybrid_attack()` pipeline are unchanged and remain correct; they just require a distinguisher that actually discriminates. For round counts ≥ 65 with the current single-distinguisher architecture, the pipeline will return `BACKTRACK_EXHAUSTED` or equivalent terminal statuses.
 
 ## What would push the frontier (out-of-scope future work)
 

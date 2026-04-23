@@ -75,11 +75,11 @@ Checkpoints are published at [**cahlen/keeloq-neural-distinguishers**](https://h
 
 | File | Trained Depth | Attack Target | Val Accuracy | ROC-AUC | Status |
 |---|---:|---:|---:|---:|---|
-| `d64.pt` | 56 | 64 rounds | 0.752 | 0.828 | ✅ viable; used by the 64-round regression test |
-| `d96.pt` | 88 | 96 rounds | 0.500 | 0.508 | ❌ architectural collapse — see [ambition outcome](docs/phase3b-results/ambition_outcome.md) |
-| `d128.pt` | 120 | 128 rounds | — | — | ❌ not produced; Δ search also collapsed (see outcome doc) |
+| `d64.pt` | 56 | 64 rounds (peel K=8) | 0.752 | 0.828 | ✅ viable; used by the 64-round regression test |
 
-Each `.pt` file embeds its full `TrainingConfig`, so results are reproducible from seed alone. The d96/d128 collapse is an architectural finding — the 1×1-conv depth-5 width-512 ResNet has a signal horizon somewhere between depth 56 and 88 on KeeLoq. See [`docs/phase3b-results/ambition_outcome.md`](docs/phase3b-results/ambition_outcome.md) for the full analysis, diagnostic tables, and proposed architectural directions that would push the frontier.
+`d64.pt` is the only viable checkpoint — we tested every depth from 57 through 120 and found a **one-round-wide signal cliff between depth 56 and depth 57** (signal drops from 0.69 to 0.54 val-acc in a single round, then stays at noise through depth 120). Two architectures (1×1-conv MLP-style and kernel-3 spatial-conv) collapse identically at depths past 56, indicating the horizon is a property of KeeLoq's diffusion at these rounds, not a neural-architecture artifact. The full diagnostic trail (horizon probe tables, v1-vs-v2 comparison, proposed frontier directions) is in [`docs/phase3b-results/ambition_outcome.md`](docs/phase3b-results/ambition_outcome.md).
+
+Each `.pt` file embeds its full `TrainingConfig`, so results are reproducible from seed alone.
 
 ## Pipeline composition via Unix pipes
 
