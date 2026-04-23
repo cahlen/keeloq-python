@@ -26,11 +26,12 @@ We also ran a full-scale training run at depth 88 with `Δ=0x00000002` (10 M sam
 
 ## Interpretation
 
-The sharp transition between depth 56 (clear signal across ~40 candidate Δs) and depth 88 (no signal on any candidate) suggests an architectural discoverability horizon, not a data-volume issue. Three data points supporting this:
+The sharp transition between depth 56 (clear signal across ~40 candidate Δs) and depth 88 (no signal on any candidate) is consistent with a KeeLoq-specific diffusion-based signal horizon, not an architectural artifact. Evidence:
 
-1. **Horizontal flatness at depths 88 and 120.** If the issue were Δ-specific, we'd expect a few candidates to stand out. Instead, all candidates cluster tightly in [0.50, 0.52] at both deep depths — suggesting the architecture can't decompose *any* differential feature useful at those depths, not that our Δ set is bad.
-2. **Sample efficiency held at depth 56.** With just 200 000 samples × 2 epochs, the tiny models at depth 56 comfortably reach val-acc 0.63–0.69. If the same sample budget at depth 88 produced 0.51, it's not a data-budget problem — it's an architectural expressiveness problem.
-3. **KeeLoq's 1-bit-per-round diffusion geometry** is consistent with this. After ~60 rounds every bit of the 32-bit state has been touched multiple times by the NLF; the residual signal a bit-sliced ResNet-1D-CNN with 1×1 convolutions can see from local bit patterns goes to zero. A model with spatial structure along the bit-position axis (not just the channel axis) would be better-equipped here.
+1. **Horizontal flatness at depths 88 and 120.** If the issue were Δ-specific, we'd expect a few candidates to stand out. Instead, all candidates cluster tightly in [0.50, 0.52] at both deep depths — the architecture can't decompose *any* differential feature useful at those depths, not that our Δ set is bad.
+2. **Sample efficiency held at depth 56.** With just 200 000 samples × 2 epochs, the tiny models at depth 56 comfortably reach val-acc 0.63–0.69. If the same sample budget at depth 88 produced 0.51, it's not a data-budget problem.
+3. **Two architectures collapse identically.** We tested the original 1×1-conv MLP-style ResNet (`Distinguisher`, v1) alongside a kernel-size-3 spatial-conv ResNet (`DistinguisherSpatial`, v2) that uses an inductive bias for bit-neighbor correlations. Both succeed at depth 56 (v1 best 0.688, v2 best 0.703 — essentially equivalent) and both collapse identically at depths 88 and 120 (all candidates within statistical noise of 0.5). See [`v2_experiment.md`](v2_experiment.md) for the head-to-head table. The fact that adding spatial inductive bias did *not* unlock signal at depth 88 is strong evidence the horizon is a property of the cipher, not a limitation of any one network shape.
+4. **KeeLoq's 1-bit-per-round diffusion geometry** is consistent with this. After ~60 rounds every bit of the 32-bit state has been touched multiple times by the NLF; the differential signal in ciphertext pairs decays below what moderate-capacity supervised learning can discover without an explosion in data. A full cryptanalytic treatment of where exactly differential trails die out on KeeLoq would sharpen this into a quantitative threshold.
 
 ## Concrete impact on the Phase 3b pipeline
 
@@ -43,14 +44,15 @@ The `keeloq neural recover-key` CLI and `hybrid_attack()` pipeline are unchanged
 
 ## What would push the frontier (out-of-scope future work)
 
-Research directions worth pursuing in a follow-up phase:
+Directions still worth pursuing, with revised priority given that spatial
+inductive bias was ruled out by the v2 experiment:
 
-1. **Architecture with spatial structure along the bit axis.** Put the 32 bit positions along a sequence dimension and run 3- or 5-tap convolutions across them, so the model sees bit-neighbor correlations, not just marginal statistics. Gohr's original SPECK architecture had this structure; our 1×1 version sacrificed it.
-2. **Wider / deeper backbone.** ResNet at width 2048+ or a small transformer over bit positions.
-3. **Two orders of magnitude more training data.** Gohr-style problems often exhibit slow power-law scaling near their discoverability threshold; 100 M – 1 B samples may surface signal that 10 M misses.
-4. **Family of distinguishers at intermediate depths** (e.g., every 4 rounds from 56 to 120) rather than a single distinguisher asked to peel 32 rounds. Fixes the "signal degrades away from the trained depth" problem Task 10 identified.
-5. **Alternative scoring structures.** Energy-based models, autoregressive bit-by-bit scoring over the state, or set-consistency detectors over candidate key batches — rather than a single binary scalar.
-6. **Gröbner / F4-F5 hybrid.** Combine the Phase 1 algebraic system with neural-guided variable orderings (Phase 3a in the original roadmap, deferred).
+1. **Two orders of magnitude more training data.** Gohr-style problems often exhibit slow power-law scaling near their discoverability threshold; 100 M – 1 B samples may surface signal that 10 M misses. Now the leading candidate since both tested architectures match.
+2. **Family of distinguishers at intermediate depths** (e.g., every 4 rounds from 56 to 88) rather than a single distinguisher asked to peel to depth 88. Fixes the "signal degrades away from the trained depth" problem Task 10 identified and works around the horizon by staying inside it.
+3. **Wider / deeper backbone.** ResNet at width 2048+ or a small transformer over bit positions. Less theoretically motivated after the v2 experiment but sample efficiency could still improve.
+4. **Alternative scoring structures.** Energy-based models, autoregressive bit-by-bit scoring over the state, or set-consistency detectors over candidate key batches — rather than a single binary scalar.
+5. **Gröbner / F4-F5 hybrid.** Combine the Phase 1 algebraic system with neural-guided variable orderings (Phase 3a in the original roadmap, deferred).
+6. **Quantitative differential-trail analysis.** Directly analyze KeeLoq's differential branch numbers round-by-round to locate the precise point where any single-Δ trail reaches round-function entropy. That number is the theoretical minimum horizon for *any* differential distinguisher; comparing it to the empirical ~80-round collapse seen here would either close the gap or motivate multi-Δ / higher-order differential approaches.
 
 ## Phase 3b status
 
@@ -65,7 +67,8 @@ Research directions worth pursuing in a follow-up phase:
 
 Raw artifacts referenced here:
 
-- [`delta_search.md`](delta_search.md) — Δ candidate rankings at depths 56 / 88 / 120.
+- [`delta_search.md`](delta_search.md) — Δ candidate rankings at depths 56 / 88 / 120 (v1 architecture).
+- [`v2_experiment.md`](v2_experiment.md) — Δ candidate rankings at depths 56 / 88 / 120 with the v2 spatial-conv architecture; same collapse pattern.
 - [`eval_d64.json`](eval_d64.json) — d64 full-scale evaluation (1 M samples).
 - [`train_d64.json`](train_d64.json) — d64 training summary.
 - [`train_d96.json`](train_d96.json) — d96 training summary (showing collapse).
