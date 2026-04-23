@@ -20,6 +20,7 @@ from keeloq.cipher import encrypt as _encrypt
 from keeloq.encoders import CNFInstance, HybridInstance
 from keeloq.encoders.cnf import encode as _encode_cnf
 from keeloq.encoders.xor_aware import encode as _encode_xor
+from keeloq.neural.cli_neural import neural_app
 from keeloq.solvers import SolveResult
 from keeloq.solvers.cryptominisat import solve as _solve_cms
 from keeloq.solvers.dimacs_subprocess import solve as _solve_subprocess
@@ -330,6 +331,8 @@ def benchmark(
     run_matrix(Path(matrix), out_path)
     typer.echo(f"wrote results to {out_path}/")
 
+
+app.add_typer(neural_app, name="neural")
 
 if __name__ == "__main__":
     app()
