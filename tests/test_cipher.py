@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from keeloq._types import bits_to_int
 from keeloq.cipher import core, decrypt, encrypt
@@ -86,3 +88,13 @@ def test_encrypt_rejects_oversized_inputs() -> None:
         encrypt(0, 1 << 64, 10)
     with pytest.raises(ValueError):
         encrypt(0, 0, -1)
+
+
+@settings(max_examples=500)
+@given(
+    plaintext=st.integers(min_value=0, max_value=(1 << 32) - 1),
+    key=st.integers(min_value=0, max_value=(1 << 64) - 1),
+    rounds=st.integers(min_value=0, max_value=600),
+)
+def test_encrypt_decrypt_roundtrip_property(plaintext: int, key: int, rounds: int) -> None:
+    assert decrypt(encrypt(plaintext, key, rounds), key, rounds) == plaintext
