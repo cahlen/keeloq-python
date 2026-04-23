@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from keeloq.anf import BoolPoly, one, var, variables, zero
+from keeloq.anf import BoolPoly, one, round_equations, var, variables, zero
 
 
 def test_zero_is_empty() -> None:
@@ -104,3 +104,71 @@ def test_variable_ordering() -> None:
     b_idx = vs.index("B0_p0")
     l_idx = vs.index("L0_p0")
     assert k_idx < a_idx < b_idx < l_idx
+
+
+def test_round_equations_returns_three_polys() -> None:
+    eqs = round_equations(round_idx=0, pair_idx=0)
+    assert len(eqs) == 3
+
+
+def test_round_equation_eq2_is_a_equals_l31_l26() -> None:
+    """From legacy/sage-equations.py:32:  A{i} + L{i+31}*L{i+26}.
+    In our naming: A0_p0 + L31_p0*L26_p0."""
+    _, eq2, _ = round_equations(round_idx=0, pair_idx=0)
+    expected = var("A0_p0") + var("L31_p0") * var("L26_p0")
+    assert eq2 == expected
+
+
+def test_round_equation_eq3_is_b_equals_l31_l1() -> None:
+    _, _, eq3 = round_equations(round_idx=0, pair_idx=0)
+    expected = var("B0_p0") + var("L31_p0") * var("L1_p0")
+    assert eq3 == expected
+
+
+def test_round_equation_eq1_structure_at_round_0() -> None:
+    """Match legacy/sage-equations.py:31 exactly, modulo pair suffix."""
+    eq1, _, _ = round_equations(round_idx=0, pair_idx=0)
+    # eq1 = L32 + K0 + L0 + L16 + L9 + L1 + L31*L20 + B0 + L26*L20
+    #       + L26*L1 + L20*L9 + L9*L1 + B0*L9 + B0*L20 + A0*L9 + A0*L20
+    expected = (
+        var("L32_p0") + var("K0") + var("L0_p0") + var("L16_p0")
+        + var("L9_p0") + var("L1_p0")
+        + var("L31_p0") * var("L20_p0")
+        + var("B0_p0")
+        + var("L26_p0") * var("L20_p0")
+        + var("L26_p0") * var("L1_p0")
+        + var("L20_p0") * var("L9_p0")
+        + var("L9_p0") * var("L1_p0")
+        + var("B0_p0") * var("L9_p0")
+        + var("B0_p0") * var("L20_p0")
+        + var("A0_p0") * var("L9_p0")
+        + var("A0_p0") * var("L20_p0")
+    )
+    assert eq1 == expected
+
+
+def test_round_equation_indices_shift_with_round() -> None:
+    """At round i, eq1 involves L{32+i}, K{i%64}, L{i}, L{i+16}, ..."""
+    eq1, eq2, eq3 = round_equations(round_idx=5, pair_idx=0)
+    assert "L37_p0" in eq1.variables()  # L{32+5}
+    assert "K5" in eq1.variables()
+    assert "A5_p0" in eq2.variables()
+    assert "B5_p0" in eq3.variables()
+
+
+def test_round_equation_key_index_wraps_at_64() -> None:
+    eq1_round0, _, _ = round_equations(round_idx=0, pair_idx=0)
+    eq1_round64, _, _ = round_equations(round_idx=64, pair_idx=0)
+    # Both should reference K0 (0 % 64 == 0 and 64 % 64 == 0)
+    assert "K0" in eq1_round0.variables()
+    assert "K0" in eq1_round64.variables()
+
+
+def test_round_equation_pair_index_changes_names() -> None:
+    eq1_p0, _, _ = round_equations(round_idx=0, pair_idx=0)
+    eq1_p1, _, _ = round_equations(round_idx=0, pair_idx=1)
+    assert "L32_p0" in eq1_p0.variables()
+    assert "L32_p1" in eq1_p1.variables()
+    # K variables still shared
+    assert "K0" in eq1_p0.variables()
+    assert "K0" in eq1_p1.variables()

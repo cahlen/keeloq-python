@@ -95,3 +95,41 @@ def variables(rounds: int, num_pairs: int = 1) -> list[str]:
         out += [f"B{i}_p{p}" for i in range(rounds)]
         out += [f"L{i}_p{p}" for i in range(rounds + 32)]
     return out
+
+
+def round_equations(round_idx: int, pair_idx: int = 0) -> tuple[BoolPoly, BoolPoly, BoolPoly]:
+    """Return the three ANF equations for a single round, for a specific pair.
+
+    Equation shapes (from legacy/sage-equations.py:31-33):
+
+        eq1 = L{i+32} + K{i%64} + L{i} + L{i+16} + L{i+9} + L{i+1}
+              + L{i+31}*L{i+20} + B{i}
+              + L{i+26}*L{i+20} + L{i+26}*L{i+1}
+              + L{i+20}*L{i+9} + L{i+9}*L{i+1}
+              + B{i}*L{i+9} + B{i}*L{i+20}
+              + A{i}*L{i+9} + A{i}*L{i+20}
+        eq2 = A{i} + L{i+31}*L{i+26}
+        eq3 = B{i} + L{i+31}*L{i+1}
+    """
+    if round_idx < 0 or pair_idx < 0:
+        raise ValueError("round_idx and pair_idx must be non-negative")
+
+    i = round_idx
+    p = pair_idx
+
+    def lv(offset: int) -> BoolPoly:
+        return var(f"L{offset}_p{p}")
+
+    kv = var(f"K{i % 64}")
+    av = var(f"A{i}_p{p}")
+    bv = var(f"B{i}_p{p}")
+
+    eq1 = (lv(i + 32) + kv + lv(i) + lv(i + 16) + lv(i + 9) + lv(i + 1)
+           + lv(i + 31) * lv(i + 20) + bv
+           + lv(i + 26) * lv(i + 20) + lv(i + 26) * lv(i + 1)
+           + lv(i + 20) * lv(i + 9) + lv(i + 9) * lv(i + 1)
+           + bv * lv(i + 9) + bv * lv(i + 20)
+           + av * lv(i + 9) + av * lv(i + 20))
+    eq2 = av + lv(i + 31) * lv(i + 26)
+    eq3 = bv + lv(i + 31) * lv(i + 1)
+    return eq1, eq2, eq3
