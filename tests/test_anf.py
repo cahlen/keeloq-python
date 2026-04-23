@@ -69,13 +69,13 @@ def test_variable_count_single_pair() -> None:
     # 64 K's + 1 pair * (3*rounds + 32 L's) = 64 + 3*rounds + 32 for num_pairs=1
     for rounds in (1, 16, 32, 160):
         vs = variables(rounds=rounds, num_pairs=1)
-        assert len(vs) == 64 + 1*(3*rounds + 32), f"rounds={rounds}"
+        assert len(vs) == 64 + 1 * (3 * rounds + 32), f"rounds={rounds}"
         assert len(vs) == len(set(vs)), "no duplicates"
 
 
 def test_variable_count_multi_pair() -> None:
     vs = variables(rounds=32, num_pairs=2)
-    assert len(vs) == 64 + 2*(3*32 + 32)  # 64 + 2*128 = 320
+    assert len(vs) == 64 + 2 * (3 * 32 + 32)  # 64 + 2*128 = 320
     assert len(vs) == len(set(vs))
 
 
@@ -132,8 +132,12 @@ def test_round_equation_eq1_structure_at_round_0() -> None:
     # eq1 = L32 + K0 + L0 + L16 + L9 + L1 + L31*L20 + B0 + L26*L20
     #       + L26*L1 + L20*L9 + L9*L1 + B0*L9 + B0*L20 + A0*L9 + A0*L20
     expected = (
-        var("L32_p0") + var("K0") + var("L0_p0") + var("L16_p0")
-        + var("L9_p0") + var("L1_p0")
+        var("L32_p0")
+        + var("K0")
+        + var("L0_p0")
+        + var("L16_p0")
+        + var("L9_p0")
+        + var("L1_p0")
         + var("L31_p0") * var("L20_p0")
         + var("B0_p0")
         + var("L26_p0") * var("L20_p0")
@@ -180,20 +184,20 @@ def test_system_size_single_pair_no_hints() -> None:
     pt, ct = 0xDEADBEEF, 0
     sys = system(rounds=rounds, pairs=[(pt, ct)], key_hints=None)
     # Expected: 32 plaintext bindings + 32 ciphertext bindings + 3*rounds round equations
-    assert len(sys) == 32 + 32 + 3*rounds
+    assert len(sys) == 32 + 32 + 3 * rounds
 
 
 def test_system_size_with_hints() -> None:
     rounds = 4
     sys = system(rounds=rounds, pairs=[(0, 0)], key_hints={0: 1, 5: 0, 10: 1})
-    assert len(sys) == 32 + 32 + 3*rounds + 3
+    assert len(sys) == 32 + 32 + 3 * rounds + 3
 
 
 def test_system_size_multi_pair() -> None:
     rounds = 4
     sys = system(rounds=rounds, pairs=[(0, 0), (1, 1)], key_hints=None)
     # 2 pairs each contribute 32+32+3*rounds; K-hints are shared (0 here)
-    assert len(sys) == 2 * (32 + 32 + 3*rounds)
+    assert len(sys) == 2 * (32 + 32 + 3 * rounds)
 
 
 def test_true_solution_satisfies_every_equation_single_pair() -> None:
@@ -207,8 +211,9 @@ def test_true_solution_satisfies_every_equation_single_pair() -> None:
     sys = system(rounds=rounds, pairs=[(pt, ct)], key_hints=None)
     assignment = _derive_true_assignment(pt, ct, key, rounds, pair_idx=0)
     for idx, poly in enumerate(sys):
-        assert poly.substitute(assignment) == 0, \
+        assert poly.substitute(assignment) == 0, (
             f"equation {idx} not satisfied: vars={poly.variables()}"
+        )
 
 
 def test_true_solution_satisfies_multi_pair() -> None:
@@ -229,8 +234,9 @@ def test_true_solution_satisfies_multi_pair() -> None:
         assert poly.substitute(assignment) == 0, f"equation {idx} unsatisfied"
 
 
-def _derive_true_assignment(pt: int, ct: int, key: int, rounds: int,
-                             pair_idx: int) -> dict[str, int]:
+def _derive_true_assignment(
+    pt: int, ct: int, key: int, rounds: int, pair_idx: int
+) -> dict[str, int]:
     """Run the cipher and record every L/A/B intermediate value + K bits."""
     from keeloq.cipher import _key_bit, _state_bit, core
 
@@ -261,7 +267,7 @@ def _derive_true_assignment(pt: int, ct: int, key: int, rounds: int,
         kbit = _key_bit(key, i % 64)
         newb = (kbit + l0 + l16 + core(l31, l26, l20, l9, l1)) % 2
         state = ((state << 1) & 0xFFFFFFFF) | newb
-        assignment[f"L{i+32}_p{pair_idx}"] = newb
+        assignment[f"L{i + 32}_p{pair_idx}"] = newb
 
     # Sanity: post-rounds state matches ciphertext
     assert state == ct, f"cipher reference disagreement: got {state:08x} want {ct:08x}"

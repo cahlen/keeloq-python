@@ -124,12 +124,24 @@ def round_equations(round_idx: int, pair_idx: int = 0) -> tuple[BoolPoly, BoolPo
     av = var(f"A{i}_p{p}")
     bv = var(f"B{i}_p{p}")
 
-    eq1 = (lv(i + 32) + kv + lv(i) + lv(i + 16) + lv(i + 9) + lv(i + 1)
-           + lv(i + 31) * lv(i + 20) + bv
-           + lv(i + 26) * lv(i + 20) + lv(i + 26) * lv(i + 1)
-           + lv(i + 20) * lv(i + 9) + lv(i + 9) * lv(i + 1)
-           + bv * lv(i + 9) + bv * lv(i + 20)
-           + av * lv(i + 9) + av * lv(i + 20))
+    eq1 = (
+        lv(i + 32)
+        + kv
+        + lv(i)
+        + lv(i + 16)
+        + lv(i + 9)
+        + lv(i + 1)
+        + lv(i + 31) * lv(i + 20)
+        + bv
+        + lv(i + 26) * lv(i + 20)
+        + lv(i + 26) * lv(i + 1)
+        + lv(i + 20) * lv(i + 9)
+        + lv(i + 9) * lv(i + 1)
+        + bv * lv(i + 9)
+        + bv * lv(i + 20)
+        + av * lv(i + 9)
+        + av * lv(i + 20)
+    )
     eq2 = av + lv(i + 31) * lv(i + 26)
     eq3 = bv + lv(i + 31) * lv(i + 1)
     return eq1, eq2, eq3
