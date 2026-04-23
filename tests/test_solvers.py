@@ -1,11 +1,14 @@
 """Tests for solver wrappers."""
 from __future__ import annotations
 
+import pytest
+
 from keeloq.anf import one, system, var
 from keeloq.cipher import encrypt
 from keeloq.encoders.cnf import encode as encode_cnf
 from keeloq.encoders.xor_aware import encode as encode_xor
 from keeloq.solvers.cryptominisat import solve as solve_cms
+from keeloq.solvers.dimacs_subprocess import solve as solve_subprocess
 
 
 def test_trivial_sat_cnf() -> None:
@@ -54,3 +57,24 @@ def test_stats_are_populated() -> None:
     assert r.stats.num_vars >= 2
     assert r.stats.num_clauses >= 1
     assert r.stats.solver_name == "cryptominisat"
+
+
+@pytest.mark.solver_kissat
+def test_kissat_trivial_sat() -> None:
+    inst = encode_cnf([var("x") + one()])
+    r = solve_subprocess(inst, solver_binary="kissat", timeout_s=5.0)
+    assert r.status == "SAT"
+    assert r.assignment is not None and r.assignment["x"] == 1
+
+
+@pytest.mark.solver_kissat
+def test_kissat_trivial_unsat() -> None:
+    inst = encode_cnf([one()])
+    r = solve_subprocess(inst, solver_binary="kissat", timeout_s=5.0)
+    assert r.status == "UNSAT"
+
+
+def test_subprocess_rejects_hybrid_instance() -> None:
+    inst = encode_xor([var("x") + one()])
+    with pytest.raises(Exception, match="CNFInstance"):
+        solve_subprocess(inst, solver_binary="kissat", timeout_s=5.0)  # type: ignore[arg-type]
