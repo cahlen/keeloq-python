@@ -7,6 +7,9 @@ probability of the "real" label.
 
 from __future__ import annotations
 
+import time
+from dataclasses import dataclass, field
+
 import torch
 from torch import nn
 
@@ -68,3 +71,110 @@ class Distinguisher(nn.Module):
         h = h.squeeze(-1)  # (N, width)
         logits = self.head(h).squeeze(-1)  # (N,)
         return torch.sigmoid(logits)
+
+
+from keeloq.neural.data import generate_pairs  # noqa: E402
+
+
+@dataclass(frozen=True)
+class TrainingConfig:
+    rounds: int
+    delta: int
+    n_samples: int
+    batch_size: int
+    epochs: int
+    lr: float
+    weight_decay: float
+    seed: int
+    depth: int = 5
+    width: int = 512
+    val_samples: int = 20_000
+
+
+@dataclass(frozen=True)
+class TrainingResult:
+    final_loss: float
+    final_val_accuracy: float
+    wall_time_s: float
+    config: TrainingConfig
+    history: list[dict[str, float]] = field(default_factory=list)
+
+
+def _set_seeds(seed: int) -> None:
+    import random
+
+    import numpy as np
+
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+
+
+def _compute_val_accuracy(model: Distinguisher, cfg: TrainingConfig) -> float:
+    model.train(False)  # inference mode — same as .train(False)
+    correct = 0
+    total = 0
+    with torch.no_grad():
+        for batch in generate_pairs(
+            rounds=cfg.rounds,
+            delta=cfg.delta,
+            n_samples=cfg.val_samples,
+            seed=cfg.seed + 1_000_000,
+            batch_size=min(cfg.batch_size, cfg.val_samples),
+        ):
+            preds = (model(batch.pairs) >= 0.5).float()
+            correct += (preds == batch.labels).sum().item()
+            total += batch.labels.shape[0]
+    model.train(True)
+    return correct / max(1, total)
+
+
+def train(cfg: TrainingConfig) -> tuple[Distinguisher, TrainingResult]:
+    _set_seeds(cfg.seed)
+    model = Distinguisher(depth=cfg.depth, width=cfg.width).cuda()
+    opt = torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
+    criterion = nn.BCELoss()
+
+    steps_per_epoch = max(1, cfg.n_samples // cfg.batch_size)
+    total_steps = steps_per_epoch * cfg.epochs
+    sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=total_steps)
+
+    history: list[dict[str, float]] = []
+    t0 = time.perf_counter()
+
+    for epoch in range(cfg.epochs):
+        epoch_loss = 0.0
+        n_batches = 0
+        for batch in generate_pairs(
+            rounds=cfg.rounds,
+            delta=cfg.delta,
+            n_samples=cfg.n_samples,
+            seed=cfg.seed + epoch * 991,
+            batch_size=cfg.batch_size,
+        ):
+            opt.zero_grad()
+            preds = model(batch.pairs)
+            loss = criterion(preds, batch.labels)
+            loss.backward()
+            opt.step()
+            sched.step()
+            epoch_loss += float(loss.item())
+            n_batches += 1
+        val_acc = _compute_val_accuracy(model, cfg)
+        history.append(
+            {
+                "epoch": float(epoch),
+                "train_loss": epoch_loss / max(1, n_batches),
+                "val_accuracy": val_acc,
+            }
+        )
+
+    wall = time.perf_counter() - t0
+    return model, TrainingResult(
+        final_loss=history[-1]["train_loss"],
+        final_val_accuracy=history[-1]["val_accuracy"],
+        wall_time_s=wall,
+        config=cfg,
+        history=history,
+    )

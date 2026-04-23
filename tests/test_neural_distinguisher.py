@@ -52,3 +52,46 @@ def test_distinguisher_param_count_sane() -> None:
     model = Distinguisher()
     n = sum(p.numel() for p in model.parameters() if p.requires_grad)
     assert 1_000_000 < n < 50_000_000, f"param count {n} out of range"
+
+
+@pytest.mark.gpu
+def test_train_reaches_high_acc_on_trivial_task() -> None:
+    from keeloq.neural.distinguisher import TrainingConfig, train
+
+    cfg = TrainingConfig(
+        rounds=1,
+        delta=0x80000000,
+        n_samples=50_000,
+        batch_size=1024,
+        epochs=2,
+        lr=2e-3,
+        weight_decay=1e-5,
+        seed=0,
+        depth=2,
+        width=16,
+    )
+    _model, result = train(cfg)
+    assert result.final_val_accuracy >= 0.9, result
+    assert result.final_loss < 0.5
+
+
+@pytest.mark.gpu
+def test_train_seed_reproducibility() -> None:
+    from keeloq.neural.distinguisher import TrainingConfig, train
+
+    cfg = TrainingConfig(
+        rounds=1,
+        delta=0x80000000,
+        n_samples=8000,
+        batch_size=256,
+        epochs=1,
+        lr=1e-3,
+        weight_decay=1e-5,
+        seed=99,
+        depth=2,
+        width=8,
+    )
+    m1, _ = train(cfg)
+    m2, _ = train(cfg)
+    for p1, p2 in zip(m1.parameters(), m2.parameters(), strict=True):
+        assert torch.allclose(p1, p2, atol=1e-5)
