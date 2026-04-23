@@ -1,4 +1,5 @@
 """Protocol for SAT solvers and shared result types."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

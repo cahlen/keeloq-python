@@ -1,4 +1,5 @@
 """Tests for the XOR-aware hybrid encoder."""
+
 from __future__ import annotations
 
 from keeloq.anf import one, system, var
@@ -51,6 +52,7 @@ def test_solves_tiny_instance() -> None:
     inst = encode(sys)
 
     from pycryptosat import Solver
+
     s = Solver()
     for c in inst.cnf_clauses:
         s.add_clause(list(c))

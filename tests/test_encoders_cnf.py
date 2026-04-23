@@ -1,4 +1,5 @@
 """Tests for the pure-CNF encoder."""
+
 from __future__ import annotations
 
 from keeloq.anf import one, system, var
@@ -18,6 +19,7 @@ def test_encode_unsatisfiable_zero_equals_one() -> None:
     # Must contain at least the empty clause (pure UNSAT) or an equivalent contradiction.
     # We assert by solving.
     from pycryptosat import Solver
+
     s = Solver()
     for clause in inst.clauses:
         s.add_clause(list(clause))
@@ -33,6 +35,7 @@ def test_encode_single_variable_equation() -> None:
     assert inst.var_names == ("x",)
     # Should be satisfiable with x=1
     from pycryptosat import Solver
+
     s = Solver()
     for clause in inst.clauses:
         s.add_clause(list(clause))
@@ -46,6 +49,7 @@ def test_encode_xor_equation() -> None:
     poly = var("x") + var("y") + one()
     inst = encode([poly])
     from pycryptosat import Solver
+
     s = Solver()
     for clause in inst.clauses:
         s.add_clause(list(clause))
@@ -60,6 +64,7 @@ def test_encode_simple_and_equation() -> None:
     poly = var("x") * var("y") + one()
     inst = encode([poly])
     from pycryptosat import Solver
+
     s = Solver()
     for clause in inst.clauses:
         s.add_clause(list(clause))
@@ -78,6 +83,7 @@ def test_to_dimacs_roundtrip() -> None:
 def test_encode_tiny_keeloq_instance_is_solvable_with_heavy_hints() -> None:
     """2-round attack with 63 of 64 key bits hinted should solve trivially."""
     from keeloq.cipher import encrypt
+
     rounds = 2
     pt = 0xAAAA5555
     key = 0x0123_4567_89AB_CDEF
@@ -87,6 +93,7 @@ def test_encode_tiny_keeloq_instance_is_solvable_with_heavy_hints() -> None:
     inst = encode(sys)
 
     from pycryptosat import Solver
+
     s = Solver()
     for clause in inst.clauses:
         s.add_clause(list(clause))

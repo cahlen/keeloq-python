@@ -3,6 +3,7 @@
 Only accepts CNFInstance — external solvers don't understand our HybridInstance
 XOR clauses. If you want XOR, use solvers.cryptominisat.
 """
+
 from __future__ import annotations
 
 import shutil
@@ -19,8 +20,10 @@ from keeloq.solvers import SolveResult, SolverStats
 
 def solve(instance: SolverInstance, solver_binary: str, timeout_s: float) -> SolveResult:
     if not isinstance(instance, CNFInstance):
-        raise SolverError("DIMACS subprocess solvers only accept CNFInstance "
-                          "(HybridInstance requires a native XOR-capable solver)")
+        raise SolverError(
+            "DIMACS subprocess solvers only accept CNFInstance "
+            "(HybridInstance requires a native XOR-capable solver)"
+        )
 
     binary_path = shutil.which(solver_binary) or solver_binary
     if not Path(binary_path).exists():
@@ -33,8 +36,7 @@ def solve(instance: SolverInstance, solver_binary: str, timeout_s: float) -> Sol
     cmd = [binary_path, cnf_path]
     t0 = time.perf_counter()
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True,
-                              timeout=timeout_s)
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_s)
     except subprocess.TimeoutExpired:
         elapsed = time.perf_counter() - t0
         return SolveResult(
@@ -70,8 +72,10 @@ def solve(instance: SolverInstance, solver_binary: str, timeout_s: float) -> Sol
         return SolveResult(status="TIMEOUT", assignment=None, stats=stats)
 
     if assignment_lits is None:
-        raise SolverError(f"solver {solver_binary!r} reported SAT but emitted "
-                          f"no v-line. stdout:\n{output}\nstderr:\n{proc.stderr}")
+        raise SolverError(
+            f"solver {solver_binary!r} reported SAT but emitted "
+            f"no v-line. stdout:\n{output}\nstderr:\n{proc.stderr}"
+        )
 
     assignment: dict[str, int] = {}
     lit_set = set(assignment_lits)

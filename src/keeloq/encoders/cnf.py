@@ -11,6 +11,7 @@ Strategy:
         as a disjunction of parity clauses (2^(n-1) clauses for n operands).
   - Emit CNF in DIMACS form.
 """
+
 from __future__ import annotations
 
 from itertools import combinations
@@ -61,9 +62,7 @@ def _xor_clauses(literals: list[int], rhs: int) -> list[tuple[int, ...]]:
         if flip_size % 2 != forbidden_parity:
             continue
         for flips in combinations(range(n), flip_size):
-            clause = tuple(
-                -literals[i] if i in flips else literals[i] for i in range(n)
-            )
+            clause = tuple(-literals[i] if i in flips else literals[i] for i in range(n))
             clauses.append(clause)
     return clauses
 
@@ -131,5 +130,4 @@ def from_dimacs(text: str, var_names: tuple[str, ...]) -> CNFInstance:
         if lits and lits[-1] == 0:
             lits = lits[:-1]
         clauses.append(tuple(lits))
-    return CNFInstance(num_vars=num_vars, clauses=tuple(clauses),
-                       var_names=var_names)
+    return CNFInstance(num_vars=num_vars, clauses=tuple(clauses), var_names=var_names)

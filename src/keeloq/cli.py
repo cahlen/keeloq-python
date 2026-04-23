@@ -1,4 +1,5 @@
 """keeloq command-line interface."""
+
 from __future__ import annotations
 
 import json
@@ -109,21 +110,33 @@ def _hint_bits_to_hints(original_key: str | None, hint_bits: int) -> dict[int, i
 @app.command()
 def attack(
     rounds: Annotated[int, typer.Option(help="Number of KeeLoq rounds")],
-    pair: Annotated[list[str], typer.Option(
-        help="(pt:ct) pair, repeatable. At least one required.",
-    )],
-    hint_bits: Annotated[int, typer.Option(
-        "--hint-bits",
-        help="Number of low-index key bits to hint from --original-key",
-    )] = 0,
-    key_hint: Annotated[list[str] | None, typer.Option(
-        "--key-hint",
-        help="Explicit per-bit hints in the form 'index:value', repeatable.",
-    )] = None,
-    original_key: Annotated[str | None, typer.Option(
-        "--original-key",
-        help="Reference key (required with --hint-bits; also echoed if recovery succeeds)",
-    )] = None,
+    pair: Annotated[
+        list[str],
+        typer.Option(
+            help="(pt:ct) pair, repeatable. At least one required.",
+        ),
+    ],
+    hint_bits: Annotated[
+        int,
+        typer.Option(
+            "--hint-bits",
+            help="Number of low-index key bits to hint from --original-key",
+        ),
+    ] = 0,
+    key_hint: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--key-hint",
+            help="Explicit per-bit hints in the form 'index:value', repeatable.",
+        ),
+    ] = None,
+    original_key: Annotated[
+        str | None,
+        typer.Option(
+            "--original-key",
+            help="Reference key (required with --hint-bits; also echoed if recovery succeeds)",
+        ),
+    ] = None,
     encoder: Annotated[str, typer.Option(help="cnf | xor")] = "xor",
     solver: Annotated[str, typer.Option(help="cryptominisat | kissat | minisat")] = "cryptominisat",
     timeout: Annotated[float, typer.Option(help="Solver wall-clock timeout (seconds)")] = 3600.0,
@@ -170,12 +183,11 @@ def attack(
 
 
 def _polys_to_json(polys: list[BoolPoly]) -> str:
-    return json.dumps({
-        "polynomials": [
-            [sorted(list(m)) for m in p.monomials]
-            for p in polys
-        ],
-    })
+    return json.dumps(
+        {
+            "polynomials": [[sorted(list(m)) for m in p.monomials] for p in polys],
+        }
+    )
 
 
 def _polys_from_json(text: str) -> list[BoolPoly]:
@@ -188,20 +200,24 @@ def _polys_from_json(text: str) -> list[BoolPoly]:
 
 def _instance_to_json(inst: CNFInstance | HybridInstance) -> str:
     if isinstance(inst, CNFInstance):
-        return json.dumps({
-            "type": "cnf",
-            "num_vars": inst.num_vars,
-            "clauses": [list(c) for c in inst.clauses],
-            "var_names": list(inst.var_names),
-        })
+        return json.dumps(
+            {
+                "type": "cnf",
+                "num_vars": inst.num_vars,
+                "clauses": [list(c) for c in inst.clauses],
+                "var_names": list(inst.var_names),
+            }
+        )
     if isinstance(inst, HybridInstance):
-        return json.dumps({
-            "type": "hybrid",
-            "num_vars": inst.num_vars,
-            "cnf_clauses": [list(c) for c in inst.cnf_clauses],
-            "xor_clauses": [[list(lits), rhs] for lits, rhs in inst.xor_clauses],
-            "var_names": list(inst.var_names),
-        })
+        return json.dumps(
+            {
+                "type": "hybrid",
+                "num_vars": inst.num_vars,
+                "cnf_clauses": [list(c) for c in inst.cnf_clauses],
+                "xor_clauses": [[list(lits), rhs] for lits, rhs in inst.xor_clauses],
+                "var_names": list(inst.var_names),
+            }
+        )
     raise ValueError(f"unknown instance type {type(inst).__name__}")
 
 

@@ -1,4 +1,5 @@
 """End-to-end key-recovery pipeline: anf -> encode -> solve -> verify."""
+
 from __future__ import annotations
 
 from collections.abc import Callable

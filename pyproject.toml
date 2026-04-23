@@ -45,7 +45,7 @@ testpaths = ["tests"]
 addopts = "-ra --strict-markers --timeout=120"
 markers = [
     "gpu: requires CUDA and an NVIDIA GPU",
-    "legacy: requires python2 interpreter on PATH",
+    "legacy: requires docker with the python:2.7 image (legacy runtime; python2 is EOL)",
     "solver_kissat: requires the kissat binary on PATH",
     "solver_minisat: requires the minisat binary on PATH",
     "slow: end-to-end attack tests; excluded from -m 'not slow' runs",

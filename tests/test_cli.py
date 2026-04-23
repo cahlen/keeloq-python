@@ -1,4 +1,5 @@
 """CLI tests using Typer's CliRunner."""
+
 from __future__ import annotations
 
 from typer.testing import CliRunner
@@ -16,9 +17,7 @@ def test_encrypt_roundtrip_via_cli() -> None:
 
     result = runner.invoke(
         app,
-        ["encrypt", "--rounds", "160",
-         "--plaintext", pt_bits,
-         "--key", key_bits],
+        ["encrypt", "--rounds", "160", "--plaintext", pt_bits, "--key", key_bits],
     )
     assert result.exit_code == 0, result.stdout
     ct_bits = result.stdout.strip()
@@ -32,13 +31,15 @@ def test_decrypt_roundtrip_via_cli() -> None:
     pt_bits = "01010101010101010101010101010101"
     key_bits = "0000010000100010100011100000000010000110000011001001111000010001"
 
-    enc = runner.invoke(app, ["encrypt", "--rounds", "528",
-                              "--plaintext", pt_bits, "--key", key_bits])
+    enc = runner.invoke(
+        app, ["encrypt", "--rounds", "528", "--plaintext", pt_bits, "--key", key_bits]
+    )
     assert enc.exit_code == 0
     ct_bits = enc.stdout.strip()
 
-    dec = runner.invoke(app, ["decrypt", "--rounds", "528",
-                              "--ciphertext", ct_bits, "--key", key_bits])
+    dec = runner.invoke(
+        app, ["decrypt", "--rounds", "528", "--ciphertext", ct_bits, "--key", key_bits]
+    )
     assert dec.exit_code == 0
     assert dec.stdout.strip() == pt_bits
 
@@ -46,9 +47,7 @@ def test_decrypt_roundtrip_via_cli() -> None:
 def test_encrypt_accepts_hex() -> None:
     result = runner.invoke(
         app,
-        ["encrypt", "--rounds", "32",
-         "--plaintext", "0xAAAA5555",
-         "--key", "0x0123456789ABCDEF"],
+        ["encrypt", "--rounds", "32", "--plaintext", "0xAAAA5555", "--key", "0x0123456789ABCDEF"],
     )
     assert result.exit_code == 0
 
@@ -56,7 +55,7 @@ def test_encrypt_accepts_hex() -> None:
 def test_encrypt_rejects_wrong_length() -> None:
     result = runner.invoke(
         app,
-        ["encrypt", "--rounds", "32", "--plaintext", "1010", "--key", "01"*32],
+        ["encrypt", "--rounds", "32", "--plaintext", "1010", "--key", "01" * 32],
     )
     assert result.exit_code != 0
 
@@ -71,14 +70,21 @@ def test_attack_subcommand_end_to_end() -> None:
         app,
         [
             "attack",
-            "--rounds", "32",
-            "--pair", f"{int_to_bits(pt_int, 32)}:{int_to_bits(ct_int, 32)}",
+            "--rounds",
+            "32",
+            "--pair",
+            f"{int_to_bits(pt_int, 32)}:{int_to_bits(ct_int, 32)}",
             # Hint low 32 bits (indices 32..63):
-            "--hint-bits", "32",
-            "--original-key", key_bits,
-            "--encoder", "xor",
-            "--solver", "cryptominisat",
-            "--timeout", "30",
+            "--hint-bits",
+            "32",
+            "--original-key",
+            key_bits,
+            "--encoder",
+            "xor",
+            "--solver",
+            "cryptominisat",
+            "--timeout",
+            "30",
         ],
     )
     assert result.exit_code == 0, result.stdout
@@ -98,9 +104,20 @@ def test_attack_subcommand_multi_pair() -> None:
 
     result = runner.invoke(
         app,
-        ["attack", "--rounds", "64", "--hint-bits", "0",
-         "--encoder", "xor",
-         "--solver", "cryptominisat", "--timeout", "120", *pair_args],
+        [
+            "attack",
+            "--rounds",
+            "64",
+            "--hint-bits",
+            "0",
+            "--encoder",
+            "xor",
+            "--solver",
+            "cryptominisat",
+            "--timeout",
+            "120",
+            *pair_args,
+        ],
     )
     assert result.exit_code == 0, result.stdout
     assert key_bits in result.stdout
@@ -123,10 +140,24 @@ def test_attack_exit_code_on_unsat() -> None:
 
     result = runner.invoke(
         app,
-        ["attack", "--rounds", "16", "--pair", pair,
-         "--encoder", "cnf", "--solver", "cryptominisat", "--timeout", "10", *hint_args],
+        [
+            "attack",
+            "--rounds",
+            "16",
+            "--pair",
+            pair,
+            "--encoder",
+            "cnf",
+            "--solver",
+            "cryptominisat",
+            "--timeout",
+            "10",
+            *hint_args,
+        ],
     )
-    assert result.exit_code == 3, f"expected exit 3 (UNSAT), got {result.exit_code}\n{result.stdout}"
+    assert result.exit_code == 3, (
+        f"expected exit 3 (UNSAT), got {result.exit_code}\n{result.stdout}"
+    )
 
 
 def test_pipeline_composition_via_stdout_to_stdin() -> None:
@@ -141,8 +172,17 @@ def test_pipeline_composition_via_stdout_to_stdin() -> None:
     # Step 1: generate-anf
     anf_res = runner.invoke(
         app,
-        ["generate-anf", "--rounds", "32", "--pair", pair,
-         "--hint-bits", "32", "--original-key", int_to_bits(key_int, 64)],
+        [
+            "generate-anf",
+            "--rounds",
+            "32",
+            "--pair",
+            pair,
+            "--hint-bits",
+            "32",
+            "--original-key",
+            int_to_bits(key_int, 64),
+        ],
     )
     assert anf_res.exit_code == 0, anf_res.stdout
     anf_json = anf_res.stdout
@@ -153,9 +193,9 @@ def test_pipeline_composition_via_stdout_to_stdin() -> None:
     instance_json = enc_res.stdout
 
     # Step 3: solve
-    solve_res = runner.invoke(app, ["solve", "--solver", "cryptominisat",
-                                      "--timeout", "30"],
-                              input=instance_json)
+    solve_res = runner.invoke(
+        app, ["solve", "--solver", "cryptominisat", "--timeout", "30"], input=instance_json
+    )
     assert solve_res.exit_code == 0, solve_res.stdout
     result_json = solve_res.stdout
     parsed = json.loads(result_json)
@@ -164,8 +204,7 @@ def test_pipeline_composition_via_stdout_to_stdin() -> None:
     # Step 4: verify
     vf_res = runner.invoke(
         app,
-        ["verify", "--rounds", "32", "--pair", pair,
-         "--original-key", int_to_bits(key_int, 64)],
+        ["verify", "--rounds", "32", "--pair", pair, "--original-key", int_to_bits(key_int, 64)],
         input=result_json,
     )
     assert vf_res.exit_code == 0

@@ -4,6 +4,7 @@ Each polynomial becomes exactly one XOR clause (linearized: Tseitin auxes
 standing in for nonlinear monomials). The CNF side carries only the Tseitin
 AND-gadgets linking aux vars to their underlying products.
 """
+
 from __future__ import annotations
 
 from keeloq.anf import BoolPoly

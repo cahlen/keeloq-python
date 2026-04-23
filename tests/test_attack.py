@@ -1,4 +1,5 @@
 """Tests for the full attack pipeline."""
+
 from __future__ import annotations
 
 import pytest
@@ -41,8 +42,14 @@ def test_attack_32_rounds_32_hints(encode_fn, name) -> None:
     # Half the key hinted — 32 unknown bits.
     hints = {i: (KEY >> (63 - i)) & 1 for i in range(32, 64)}
 
-    r = attack(rounds=rounds, pairs=[(pt, ct)], key_hints=hints,
-               encoder=encode_fn, solver_fn=solve_cms, timeout_s=30.0)
+    r = attack(
+        rounds=rounds,
+        pairs=[(pt, ct)],
+        key_hints=hints,
+        encoder=encode_fn,
+        solver_fn=solve_cms,
+        timeout_s=30.0,
+    )
     assert r.status == "SUCCESS", f"encoder {name}: got {r.status}"
     assert r.recovered_key == KEY
 
@@ -56,8 +63,14 @@ def test_attack_32_rounds_two_pairs_no_hints(encode_fn: EncodeFn, name: str) -> 
     pts = [0xAAAA5555, 0x13579BDF, 0xDEADBEEF, 0x00112233]
     pairs = [(p, encrypt(p, KEY, rounds)) for p in pts]
 
-    r = attack(rounds=rounds, pairs=pairs, key_hints=None,
-               encoder=encode_fn, solver_fn=solve_cms, timeout_s=60.0)
+    r = attack(
+        rounds=rounds,
+        pairs=pairs,
+        key_hints=None,
+        encoder=encode_fn,
+        solver_fn=solve_cms,
+        timeout_s=60.0,
+    )
     assert r.status == "SUCCESS", f"encoder {name}: got {r.status}"
     assert r.recovered_key == KEY
 
@@ -68,8 +81,14 @@ def test_attack_underdetermined_detected_as_wrong_key() -> None:
     rounds = 16
     pt = 0xAAAA5555
     ct = encrypt(pt, KEY, rounds)
-    r = attack(rounds=rounds, pairs=[(pt, ct)], key_hints=None,
-               encoder=encode_cnf, solver_fn=solve_cms, timeout_s=10.0)
+    r = attack(
+        rounds=rounds,
+        pairs=[(pt, ct)],
+        key_hints=None,
+        encoder=encode_cnf,
+        solver_fn=solve_cms,
+        timeout_s=10.0,
+    )
     # The recovered key satisfies this one pair but isn't unique.
     # Status should be SUCCESS (this pair re-encrypts correctly by construction)
     # OR WRONG_KEY if the solver picks a key that's self-inconsistent somehow.
@@ -90,6 +109,12 @@ def test_attack_unsat_from_contradictory_hint() -> None:
     for i in range(32, 64):
         wrong_hint[i] = (KEY >> (63 - i)) & 1
 
-    r = attack(rounds=rounds, pairs=[(pt, ct)], key_hints=wrong_hint,
-               encoder=encode_cnf, solver_fn=solve_cms, timeout_s=10.0)
+    r = attack(
+        rounds=rounds,
+        pairs=[(pt, ct)],
+        key_hints=wrong_hint,
+        encoder=encode_cnf,
+        solver_fn=solve_cms,
+        timeout_s=10.0,
+    )
     assert r.status == "UNSAT"

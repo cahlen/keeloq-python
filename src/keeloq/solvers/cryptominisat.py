@@ -3,6 +3,7 @@
 Accepts both CNFInstance and HybridInstance. For hybrid, routes XOR clauses
 to add_xor_clause() — the whole reason we picked this solver.
 """
+
 from __future__ import annotations
 
 import time

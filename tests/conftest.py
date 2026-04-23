@@ -17,8 +17,11 @@ settings.register_profile(
 settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "ci"))
 
 
-def _python2_available() -> bool:
-    return shutil.which("python2") is not None
+def _legacy_runtime_available() -> bool:
+    """Docker + python:2.7 image is our legacy runtime (python2 is EOL)."""
+    from tests.compat_helpers import legacy_runtime_available
+
+    return legacy_runtime_available()
 
 
 def _cuda_available() -> bool:
@@ -35,8 +38,8 @@ def _binary_available(name: str) -> bool:
 
 
 @pytest.fixture(scope="session")
-def python2_available() -> bool:
-    return _python2_available()
+def legacy_runtime_available() -> bool:
+    return _legacy_runtime_available()
 
 
 @pytest.fixture(scope="session")
@@ -46,19 +49,21 @@ def cuda_available() -> bool:
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     skip_gpu = pytest.mark.skip(reason="CUDA unavailable")
-    skip_legacy = pytest.mark.skip(reason="python2 not on PATH")
+    skip_legacy = pytest.mark.skip(
+        reason="legacy runtime unavailable (need docker + python:2.7 image)"
+    )
     skip_kissat = pytest.mark.skip(reason="kissat binary not on PATH")
     skip_minisat = pytest.mark.skip(reason="minisat binary not on PATH")
 
     cuda = _cuda_available()
-    py2 = _python2_available()
+    legacy_ok = _legacy_runtime_available()
     kissat = _binary_available("kissat")
     minisat = _binary_available("minisat")
 
     for item in items:
         if "gpu" in item.keywords and not cuda:
             item.add_marker(skip_gpu)
-        if "legacy" in item.keywords and not py2:
+        if "legacy" in item.keywords and not legacy_ok:
             item.add_marker(skip_legacy)
         if "solver_kissat" in item.keywords and not kissat:
             item.add_marker(skip_kissat)

@@ -1,4 +1,5 @@
 """Compatibility tests against the frozen 2015 legacy/ scripts."""
+
 from __future__ import annotations
 
 import pytest
