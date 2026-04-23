@@ -217,18 +217,17 @@ def test_benchmark_smoke(tmp_path) -> None:
     """Run a one-row benchmark matrix and confirm CSV + MD appear."""
     matrix = tmp_path / "tiny.toml"
     matrix.write_text(
-        '[[run]]\n'
+        "[[run]]\n"
         'name = "smoke-16r-heavy"\n'
-        'rounds = 16\n'
-        'num_pairs = 1\n'
-        'hint_bits = 48\n'
+        "rounds = 16\n"
+        "num_pairs = 1\n"
+        "hint_bits = 48\n"
         'encoder = "xor"\n'
         'solver = "cryptominisat"\n'
-        'timeout_s = 30.0\n'
+        "timeout_s = 30.0\n"
     )
     out_dir = tmp_path / "out"
-    result = runner.invoke(app, ["benchmark", "--matrix", str(matrix),
-                                  "--out-dir", str(out_dir)])
+    result = runner.invoke(app, ["benchmark", "--matrix", str(matrix), "--out-dir", str(out_dir)])
     assert result.exit_code == 0, result.stdout
     # Exactly one timestamped subdir should exist.
     subdirs = list(out_dir.iterdir())

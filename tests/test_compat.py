@@ -129,9 +129,7 @@ def test_parse_minisat_matches_legacy_parser(tmp_path) -> None:
     # Now validate OUR parser extracts the same:
     from keeloq.solvers.dimacs_subprocess import _parse_dimacs_output
 
-    status, lits = _parse_dimacs_output(
-        "s SATISFIABLE\nv " + " ".join([*literals, "0"]) + "\n"
-    )
+    status, lits = _parse_dimacs_output("s SATISFIABLE\nv " + " ".join([*literals, "0"]) + "\n")
     assert status == "SAT"
     # Reconstruct the 64-bit key from the first 64 literals (1-indexed).
     our_key_bits = ""

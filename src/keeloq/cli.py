@@ -315,8 +315,9 @@ def verify(
 
 @app.command()
 def benchmark(
-    matrix: Annotated[str, typer.Option(help="Path to benchmark matrix TOML")] =
-        "benchmarks/matrix.toml",
+    matrix: Annotated[
+        str, typer.Option(help="Path to benchmark matrix TOML")
+    ] = "benchmarks/matrix.toml",
     out_dir: Annotated[str, typer.Option(help="Output directory")] = "benchmark-results",
 ) -> None:
     """Run the benchmark matrix and write CSV + markdown to an output directory."""

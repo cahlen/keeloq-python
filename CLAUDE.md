@@ -2,6 +2,40 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Phase 1 status (2026)
+
+The repo is mid-migration from the 2015 Python 2 scripts (now in `legacy/`, frozen) to a
+Python 3 modernized pipeline in `src/keeloq/`. Driver is `keeloq` (a Typer CLI,
+installed via `uv sync --all-extras`). Key entry points:
+
+- `keeloq encrypt / decrypt` — the cipher, rounds-parameterized.
+- `keeloq generate-anf | encode | solve | verify` — pipeline stages composable via Unix pipes (JSON between stages).
+- `keeloq attack` — the pipeline in-process. Use `--pair pt:ct` (repeatable) for multi-pair attacks.
+- `keeloq benchmark` — matrix runner driven by `benchmarks/matrix.toml`.
+
+Strict TDD discipline. Commits are prefixed `test:`, `impl:`, `refactor:`, `feat:`, `docs:`, `ci:`, `chore:` — do NOT squash them.
+
+**Cross-validation TDD invariant.** Two encoders (`encoders/cnf.py`, `encoders/xor_aware.py`)
+must recover the same key on the same inputs; `tests/test_encoders_agree.py` enforces this.
+Variable-indexing bugs are the biggest risk in this domain, and this cross-check is the
+primary defense.
+
+**Legacy is frozen and runs via Docker.** Never modify files in `legacy/`. The compat tests
+run the 2015 Python 2 scripts inside an ephemeral `python:2.7` container (not host
+python2, which is EOL). `tests/compat_helpers.py` handles the docker invocation. Tests
+mark `@pytest.mark.legacy`; they auto-skip if docker or the python:2.7 image is absent.
+
+**Key-schedule quirk.** KeeLoq's key cycles at 64 rounds. Attacks at `rounds < 64`
+fundamentally cannot constrain `K{rounds}..K63` — those bits must be hinted, or the
+attack must run at rounds ≥ 64 with enough plaintext/ciphertext pairs to over-determine
+the system. A clean 0-hint key recovery needs 64 rounds + ~4 pairs. This is why the
+benchmark `matrix.toml` rows with rounds < 64 always pin `hint_bits >= (64 - rounds)`.
+
+**GPU bit-sliced cipher.** `src/keeloq/gpu_cipher.py` is a PyTorch bit-sliced KeeLoq
+used as a property-test oracle. Requires CUDA; tests auto-skip on CUDA-less machines.
+Works internally on int64 tensors because `rshift_cuda` isn't implemented for uint32 on
+PyTorch 2.11 + CUDA 13; the public API uses uint32.
+
 ## What this repo is
 
 Research code for an algebraic / SAT-based attack on a reduced-round (160-round) version of the KeeLoq block cipher, originally authored 2015. It is not a library or a product — it's a small pipeline of one-shot scripts that cooperate via files (`anf.txt`, `vars.txt`, the CNF output, `out.result`).
