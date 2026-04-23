@@ -2,6 +2,7 @@
 
 Reads benchmarks/matrix.toml, runs each config, writes a CSV + markdown summary.
 """
+
 from __future__ import annotations
 
 import csv
@@ -58,9 +59,7 @@ def run_matrix(matrix_path: Path, out_dir: Path) -> Path:
         pairs = [(p, encrypt(p, key, rounds)) for p in pts[:n_pairs]]
         hint_bits = run["hint_bits"]
         hints = (
-            {i: (key >> (63 - i)) & 1 for i in range(64 - hint_bits, 64)}
-            if hint_bits > 0
-            else None
+            {i: (key >> (63 - i)) & 1 for i in range(64 - hint_bits, 64)} if hint_bits > 0 else None
         )
 
         print(f"[bench] running {run['name']!r}...", flush=True)
@@ -73,23 +72,24 @@ def run_matrix(matrix_path: Path, out_dir: Path) -> Path:
             timeout_s=run["timeout_s"],
         )
         print(
-            f"  -> status={result.status} "
-            f"wall_time_s={result.solve_result.stats.wall_time_s:.3f}",
+            f"  -> status={result.status} wall_time_s={result.solve_result.stats.wall_time_s:.3f}",
             flush=True,
         )
-        rows.append({
-            "name": run["name"],
-            "rounds": rounds,
-            "num_pairs": n_pairs,
-            "hint_bits": hint_bits,
-            "encoder": run["encoder"],
-            "solver": run["solver"],
-            "status": result.status,
-            "wall_time_s": f"{result.solve_result.stats.wall_time_s:.3f}",
-            "num_vars": result.solve_result.stats.num_vars,
-            "num_clauses": result.solve_result.stats.num_clauses,
-            "num_xors": result.solve_result.stats.num_xors,
-        })
+        rows.append(
+            {
+                "name": run["name"],
+                "rounds": rounds,
+                "num_pairs": n_pairs,
+                "hint_bits": hint_bits,
+                "encoder": run["encoder"],
+                "solver": run["solver"],
+                "status": result.status,
+                "wall_time_s": f"{result.solve_result.stats.wall_time_s:.3f}",
+                "num_vars": result.solve_result.stats.num_vars,
+                "num_clauses": result.solve_result.stats.num_clauses,
+                "num_xors": result.solve_result.stats.num_xors,
+            }
+        )
 
     csv_path = out_dir / "results.csv"
     with csv_path.open("w", newline="") as f:

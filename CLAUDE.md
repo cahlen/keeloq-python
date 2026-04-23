@@ -2,6 +2,44 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Phase 3b status (2026)
+
+Neural differential cryptanalysis pipeline in `src/keeloq/neural/`, following
+Gohr 2019 adapted for KeeLoq's 1-bit-per-round key schedule. CLI:
+
+- `keeloq neural train --rounds N --delta 0xΔ --samples M --out <ckpt>`
+- `keeloq neural evaluate --checkpoint <ckpt> --rounds N`
+- `keeloq neural recover-key --checkpoint <ckpt> --rounds N --diff-pair <c0>:<c1> --sat-pair <pt>:<ct>`
+- `keeloq neural auto --rounds N --trained-depth D --samples M --checkpoint-out <path>`
+
+**Gohr-pattern constraint.** A distinguisher trained at depth D gives strong signal only on
+D-round pairs. Peeling K rounds with a single distinguisher works well only for small K. For
+deep-round attacks, train a family of distinguishers at strategic depths (e.g. D=56 for a
+64-round attack peeling K=8 rounds). The `auto` subcommand handles this automatically.
+`neural-target-bits` controls how many prefix key-bits the neural phase covers before handing
+off to SAT.
+
+**Checkpoint policy.** Checkpoints are NOT committed to the repo by default (external GPU
+contention prevented full training runs for d64.pt/d96.pt/d128.pt). Produce them via:
+
+    uv run keeloq neural auto --rounds 64 --trained-depth 56 \
+        --samples 10000000 --pairs 512 --checkpoint-out checkpoints/d64.pt
+
+The regression test `tests/test_neural_e2e_64r.py` auto-skips when `checkpoints/d64.pt` is
+absent. Benchmark runner (`benchmarks/bench_neural.py` + `benchmarks/neural_matrix.toml`) is
+smoke-safe against missing checkpoints.
+
+**Hybrid-attack CLI.** The `recover-key` subcommand takes two distinct argument streams:
+`--diff-pair <c0>:<c1>` (differential ciphertext pairs for the neural distinguisher) and
+`--sat-pair <pt>:<ct>` (plaintext:ciphertext pairs for the SAT suffix). These are separate
+because a differential attack doesn't require known plaintexts; only the SAT phase does.
+
+**CUDA XOR limitation.** `rshift_cuda` for uint32 is not implemented in PyTorch 2.11 + CUDA
+13. All XOR / delta application is done CPU-side before tensors are moved to the GPU.
+
+Checkpoints in `checkpoints/` with training metadata embedded. Results under
+`docs/phase3b-results/`. Spec/plan in `docs/superpowers/`.
+
 ## Phase 1 status (2026)
 
 The repo is mid-migration from the 2015 Python 2 scripts (now in `legacy/`, frozen) to a

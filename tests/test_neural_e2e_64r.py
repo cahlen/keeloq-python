@@ -1,4 +1,5 @@
 """Phase 3b 64-round hybrid attack using committed d64.pt (floor commitment)."""
+
 from __future__ import annotations
 
 import time
@@ -34,21 +35,26 @@ def test_64_round_full_key_recovery() -> None:
 
     n_pairs = 512
     gen = torch.Generator(device="cpu").manual_seed(31337)
-    pts0 = torch.randint(0, 1 << 32, (n_pairs,), generator=gen,
-                         dtype=torch.int64).to(dtype=torch.uint32, device="cuda")
+    pts0 = torch.randint(0, 1 << 32, (n_pairs,), generator=gen, dtype=torch.int64).to(
+        dtype=torch.uint32, device="cuda"
+    )
     pts0_cpu = pts0.cpu()
     delta_t = torch.tensor(delta, dtype=torch.uint32)
     pts1 = (pts0_cpu ^ delta_t).to("cuda")
     keys = torch.tensor(
         [[target_key & 0xFFFFFFFF, (target_key >> 32) & 0xFFFFFFFF]] * n_pairs,
-        dtype=torch.uint32, device="cuda",
+        dtype=torch.uint32,
+        device="cuda",
     )
     c0 = encrypt_batch(pts0, keys, rounds=attack_depth)
     c1 = encrypt_batch(pts1, keys, rounds=attack_depth)
-    diff_pairs = [(int(c0[i].item()) & 0xFFFFFFFF,
-                   int(c1[i].item()) & 0xFFFFFFFF) for i in range(n_pairs)]
-    sat_pairs = [(int(pts0_cpu[i].item()) & 0xFFFFFFFF,
-                  int(c0[i].item()) & 0xFFFFFFFF) for i in range(n_pairs)]
+    diff_pairs = [
+        (int(c0[i].item()) & 0xFFFFFFFF, int(c1[i].item()) & 0xFFFFFFFF) for i in range(n_pairs)
+    ]
+    sat_pairs = [
+        (int(pts0_cpu[i].item()) & 0xFFFFFFFF, int(c0[i].item()) & 0xFFFFFFFF)
+        for i in range(n_pairs)
+    ]
 
     t0 = time.perf_counter()
     result = hybrid_attack(
