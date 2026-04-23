@@ -1,17 +1,20 @@
 """Pytest fixtures and hypothesis profiles for the keeloq test suite."""
+
 from __future__ import annotations
 
+import os
 import shutil
-import subprocess
 
 import pytest
 from hypothesis import HealthCheck, settings
 
-settings.register_profile("ci", max_examples=200, deadline=None,
-                         suppress_health_check=[HealthCheck.too_slow])
-settings.register_profile("dev", max_examples=10_000, deadline=None,
-                         suppress_health_check=[HealthCheck.too_slow])
-settings.load_profile("ci")
+settings.register_profile(
+    "ci", max_examples=200, deadline=None, suppress_health_check=[HealthCheck.too_slow]
+)
+settings.register_profile(
+    "dev", max_examples=10_000, deadline=None, suppress_health_check=[HealthCheck.too_slow]
+)
+settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "ci"))
 
 
 def _python2_available() -> bool:
@@ -21,6 +24,7 @@ def _python2_available() -> bool:
 def _cuda_available() -> bool:
     try:
         import torch
+
         return torch.cuda.is_available()
     except Exception:
         return False
@@ -40,8 +44,7 @@ def cuda_available() -> bool:
     return _cuda_available()
 
 
-def pytest_collection_modifyitems(config: pytest.Config,
-                                   items: list[pytest.Item]) -> None:
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     skip_gpu = pytest.mark.skip(reason="CUDA unavailable")
     skip_legacy = pytest.mark.skip(reason="python2 not on PATH")
     skip_kissat = pytest.mark.skip(reason="kissat binary not on PATH")

@@ -1,7 +1,7 @@
 .PHONY: install check test ci-local bench clean
 
 install:
-	uv sync
+	uv sync --all-extras
 
 check:
 	uv run ruff check src tests
