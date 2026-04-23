@@ -12,5 +12,7 @@ dist/
 build/
 *.egg-info/
 /benchmark-results/
+/benchmark-results-neural/
 /tmp/
 /scratch/
+/.claude/

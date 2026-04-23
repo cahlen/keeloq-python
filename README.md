@@ -1,74 +1,143 @@
 # keeloq-python
-A repository of code that I used to break 160 rounds of the KeeLoq cryptosystem.  Everything is written in python
-with the exception of some sage code which is used to converge a system of ANF boolean polynomial equations into
-DIMACS CNF form.  Once in this form we can feed the output file to miniSAT which determines if the system is 
-satisfiable.  If it is you can pipe the output to a file and parse it with the other python file and check to see
-if the correct key was recovered.  
 
-Usually you're going to have to feed miniSAT at least 32 bits of your key as a hint.  If you start taking away bits
-of the key then your system is going to be underdefined (espeically if you're only giving it one pair of plaintext/ciphertext).  In this case the system is still satisifiable except you'll get the wrong key back since 
-miniSAT stops as soon as it has found the system is satisfiable, and if the system is underdefined it will have 
-multiple solutions.
+Algebraic + neural cryptanalysis of the [KeeLoq](https://en.wikipedia.org/wiki/KeeLoq) block cipher — a 2026 modernization of the 2015 SAT-based attack originally in this repo.
 
-The quick fix to this is to produce another of plaintext/ciphertext under the same key.  Then produce more equations
-for the new plaintext/ciphertext, and all the intermediate variables.  The only thing that should remain the same is
-the actual key variables.  Of course this system takes longer to solve, but you get the correct key back each time.  I experimented with this and was able to cut the key bit hints down to 25 bits with two pairs of plaintext/ciphertext -- however it took 14 hours to solve this system.
+## What's here
 
-## Phase 1 (2026 modernization) — Quick start
+Two independent cryptanalysis pipelines against reduced-round KeeLoq, both drivable from a single `keeloq` CLI:
 
-Install (Linux, RTX 5090 optional, Docker recommended for legacy compat tests):
+1. **Algebraic / SAT** — Python 3, CryptoMiniSat with native XOR clauses, both pure-CNF and XOR-aware ANF encoders. Recovers a 64-bit key at **64 rounds / 0 hints / 4 plaintext-ciphertext pairs in 0.247 s** on an RTX 5090. The original 2015 pipeline took 14 hours for a harder variant (160 rounds, 25 key-bit hints, 2 pairs).
+
+2. **Neural differential (Gohr 2019 style)** — PyTorch ResNet-1D-CNN distinguisher trained on a GPU bit-sliced KeeLoq implementation (~10⁶ pairs/sec on a 5090), Bayesian beam-search key recovery, SAT-suffix handoff for the bits the distinguisher doesn't resolve. Unique angle: KeeLoq's 1-bit-per-round key schedule lets the Bayesian search guess one bit at a time rather than a 16-bit subkey chunk as in Gohr's original SPECK attack.
+
+The 2015 pipeline (SageMath + miniSAT + hand-edited polynomial systems) is frozen in `legacy/` and verified against the modern pipeline via Docker-hosted `python:2.7` parity tests.
+
+## Requirements
+
+- Linux x86_64, Python 3.12
+- [`uv`](https://docs.astral.sh/uv/) for dependency management
+- **Optional**: CUDA 12.8+ GPU (RTX 5090 or similar) — required for the neural pipeline and for property tests against the GPU bit-sliced cipher; the algebraic attack runs fine on CPU.
+- **Optional**: Docker — runs the legacy 2015 Python 2 scripts inside an ephemeral `python:2.7` container for parity tests.
+
+## Install
 
     uv sync --all-extras
 
-Run the full test suite:
+## Quickstart — algebraic attack
 
-    uv run pytest -m "not slow"
+Recover a 64-bit key at 64 rounds, 4 pairs, zero hints:
 
-Run a 64-round attack with four plaintext/ciphertext pairs and no hints:
-
-    # First, compute the two ciphertexts under the known key:
     KEY=0011010011011111100101100001110000011101100111001000001101110100
-    CT1=$(uv run keeloq encrypt --rounds 64 --plaintext 01100010100101110000101011100011 --key $KEY)
-    CT2=$(uv run keeloq encrypt --rounds 64 --plaintext 11010011100101010000111100001010 --key $KEY)
-    # Then run the attack:
-    uv run keeloq attack \
-        --rounds 64 \
-        --pair "01100010100101110000101011100011:$CT1" \
-        --pair "11010011100101010000111100001010:$CT2" \
+    PT1=01100010100101110000101011100011
+    PT2=11010011100101010000111100001010
+    CT1=$(uv run keeloq encrypt --rounds 64 --plaintext $PT1 --key $KEY)
+    CT2=$(uv run keeloq encrypt --rounds 64 --plaintext $PT2 --key $KEY)
+    uv run keeloq attack --rounds 64 \
+        --pair "$PT1:$CT1" --pair "$PT2:$CT2" \
         --encoder xor --solver cryptominisat --timeout 120
 
-Reproduce the 2015 README result (160 rounds, 25 hints, 2 pairs):
+Typical wall clock: **< 1 second**.
+
+Reproduce the 2015 README baseline (160 rounds, 25 hints, 2 pairs, legacy comparison):
 
     uv run keeloq benchmark
 
-See `docs/superpowers/specs/2026-04-22-phase1-foundation-design.md` for the
-design and `docs/superpowers/plans/2026-04-22-phase1-foundation-plan.md` for
-the implementation plan.
+## Quickstart — neural cryptanalysis
 
-## Phase 3b (neural cryptanalysis) — Quick start
-
-Train and attack end-to-end (GPU recommended, ~10 M samples):
+End-to-end, one command (Δ search + train + attack a synthetic target):
 
     uv run keeloq neural auto --rounds 64 --trained-depth 56 \
         --samples 10000000 --pairs 512 \
         --checkpoint-out checkpoints/d64.pt
 
-Or, if you have a pre-trained checkpoint:
+~30 minutes training time on an RTX 5090. Afterwards, attack any new ciphertext under the same key:
 
     uv run keeloq neural recover-key --checkpoint checkpoints/d64.pt \
-        --rounds 64 --diff-pair <c0>:<c1> --sat-pair <pt>:<ct> \
+        --rounds 64 --diff-pair "<c0>:<c1>" --sat-pair "<pt>:<ct>" \
         --beam-width 16 --sat-timeout 120
 
-**How it works (Gohr pattern).** A ResNet-1D-CNN distinguisher is trained at depth
-`--trained-depth D` (e.g. 56). It then peels K = rounds − D rounds (e.g. 8) one at a time
-via Bayesian beam search (`recover_prefix`), recovering the top K key bits. The remaining
-suffix bits are handed to Phase 1's XOR-aware encoder + CryptoMiniSat. Every recovered key
-is cipher-verified before reporting SUCCESS.
+### How it works — the Gohr pattern on KeeLoq
 
-**Separate pair streams.** `--diff-pair` carries differential ciphertext pairs (c0:c1) used
-by the neural distinguisher. `--sat-pair` carries known plaintext:ciphertext pairs used by
-the SAT solver. They are distinct because a differential attack does not require known
-plaintexts.
+A ResNet-1D-CNN distinguisher is trained at a fixed depth **D** (e.g. 56) to separate chosen-input-difference ciphertext pairs from random pairs. An **M = D + K**-round attack peels `K` rounds off via Bayesian beam search (`recover_prefix`), recovering the outer `K` key bits. The remaining suffix bits are handed to the algebraic pipeline's XOR-aware encoder + CryptoMiniSat. Every recovered key is cipher-verified (`cipher.encrypt(pt, k, rounds) == ct`) before reporting `SUCCESS`.
 
-See `docs/phase3b-results/benchmark.md` (generated by the benchmark runner after training)
-for neural-hybrid vs pure-SAT comparison across round counts.
+**Two pair streams.** `--diff-pair` carries differential ciphertext pairs `(c₀, c₁)` — both ciphertexts, consumed by the neural distinguisher. `--sat-pair` carries known `plaintext:ciphertext` — consumed by the SAT solver. These are distinct because a differential attack doesn't need known plaintexts; only the SAT phase does.
+
+**Key-schedule constraint.** KeeLoq's key cycles every 64 rounds; at fewer than 64 rounds, bits `K_rounds..K_63` are never referenced and can't be recovered without being hinted. Attacks below 64 rounds therefore auto-populate `extra_key_hints` for the unconstrained range — handled automatically by `keeloq neural auto`.
+
+## Pipeline composition via Unix pipes
+
+The algebraic pipeline is also exposed as discrete stages with JSON on stdin/stdout:
+
+    keeloq generate-anf ... | keeloq encode ... | keeloq solve ... | keeloq verify ...
+
+Useful for inspecting intermediate artifacts (ANF polynomial systems, DIMACS CNF, SAT result JSON) or for swapping in alternative encoders/solvers.
+
+## Running the tests
+
+    uv run pytest -n auto -m "not slow"    # fast suite — ~30 s on the 5090 box
+    uv run pytest -n auto                   # full suite, including GPU and slow
+
+Test markers:
+
+- `@pytest.mark.gpu` — requires a CUDA GPU; auto-skips on CPU-only machines.
+- `@pytest.mark.slow` — multi-second tests; excluded from the default fast suite but runs end-to-end attacks and benchmark smoke tests.
+- `@pytest.mark.legacy` — requires Docker + the `python:2.7` image; runs 2015 scripts and verifies parity.
+
+## Project layout
+
+    src/keeloq/          # modern Python 3 pipeline
+      cipher.py          #   readable reference cipher (rounds-parameterized)
+      gpu_cipher.py      #   bit-sliced CUDA cipher (property-test oracle + training-data generator)
+      anf.py             #   ANF polynomial system generator
+      encoders/          #   pure-CNF + XOR-aware encoders
+      solvers/           #   CryptoMiniSat wrapper + DIMACS subprocess wrapper
+      attack.py          #   SAT-only attack pipeline with mandatory cipher-verify
+      neural/            #   Phase 3b neural cryptanalysis
+        data.py          #     training pair generator (differential + random)
+        differences.py   #     Δ candidate search
+        distinguisher.py #     ResNet-1D-CNN + training loop + checkpoint I/O
+        evaluation.py    #     accuracy / ROC-AUC / TPR@FPR metrics
+        key_recovery.py  #     partial_decrypt_round + recover_prefix beam search
+        hybrid.py        #     neural-prefix + SAT-suffix orchestration
+        cli_neural.py    #     `keeloq neural {train, evaluate, recover-key, auto}`
+      cli.py             #   main Typer entry point
+
+    legacy/              # frozen 2015 Python 2 scripts (run via Docker)
+
+    benchmarks/
+      matrix.toml        # algebraic benchmark matrix (Phase 1)
+      bench_attack.py    #   runner
+      neural_matrix.toml # neural-hybrid vs pure-SAT matrix (Phase 3b)
+      bench_neural.py    #   runner
+
+    tests/               # pytest suite (unit + property + integration + compat)
+
+    checkpoints/         # trained distinguisher checkpoints (not committed; reproducible)
+
+    docs/
+      superpowers/specs/ # design docs per modernization phase
+      superpowers/plans/ # task-by-task implementation plans
+      phase3b-results/   # Δ search tables, eval reports, benchmark results
+
+## Historical context (2015 origin)
+
+The original 2015 pipeline was the target of this modernization. Frozen untouched in `legacy/`:
+
+- `keeloq-python.py` / `keeloq160-python.py` — KeeLoq reference implementations (528- and 160-round) in Python 2.
+- `sage-equations.py` / `polynomial-vars.py` — emit ANF polynomial systems and variable lists for SageMath.
+- `sage-CNF-convert.txt` — SageMath driver that converts ANF to DIMACS CNF via PolyBoRi's `CNFEncoder`.
+- `parse-miniSAT.py` — recovers the 64-bit key from miniSAT output.
+
+Original 2015 README text (preserved below for historical reference):
+
+> A repository of code that I used to break 160 rounds of the KeeLoq cryptosystem. Everything is written in python with the exception of some sage code which is used to converge a system of ANF boolean polynomial equations into DIMACS CNF form. Once in this form we can feed the output file to miniSAT which determines if the system is satisfiable. If it is you can pipe the output to a file and parse it with the other python file and check to see if the correct key was recovered.
+>
+> Usually you're going to have to feed miniSAT at least 32 bits of your key as a hint. If you start taking away bits of the key then your system is going to be underdefined (especially if you're only giving it one pair of plaintext/ciphertext). In this case the system is still satisfiable except you'll get the wrong key back since miniSAT stops as soon as it has found the system is satisfiable, and if the system is underdefined it will have multiple solutions.
+>
+> The quick fix to this is to produce another of plaintext/ciphertext under the same key. Then produce more equations for the new plaintext/ciphertext, and all the intermediate variables. The only thing that should remain the same is the actual key variables. Of course this system takes longer to solve, but you get the correct key back each time. I experimented with this and was able to cut the key bit hints down to 25 bits with two pairs of plaintext/ciphertext — however it took 14 hours to solve this system.
+
+See [`docs/superpowers/specs/`](docs/superpowers/specs/) for the design docs tracking the path from that 2015 state to the current code.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
