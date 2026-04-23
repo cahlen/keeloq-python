@@ -1,0 +1,59 @@
+# Phase 3b neural benchmark matrix.
+# Each row runs once; results write to benchmark-results-neural/<timestamp>/{results.csv, summary.md}.
+#
+# kind="neural" rows require a trained checkpoint and use hybrid_attack
+#   (neural prefix peeling + SAT suffix).  If the checkpoint is missing the row
+#   is recorded with status="SKIP_MISSING_CHECKPOINT" and the runner continues.
+#
+# kind="sat" rows use the Phase 1 pure-SAT attack (no checkpoint needed).
+#
+# Reproduce full matrix:
+#   1. Train checkpoints (requires GPU):
+#      uv run keeloq neural train --rounds 64  --delta 0x80000000 --samples 10000000 --out checkpoints/d64.pt
+#      uv run keeloq neural train --rounds 96  --delta 0x80000000 --samples 10000000 --out checkpoints/d96.pt
+#      uv run keeloq neural train --rounds 128 --delta 0x80000000 --samples 10000000 --out checkpoints/d128.pt
+#   2. Run the matrix:
+#      uv run python -m benchmarks.bench_neural
+
+[[run]]
+name              = "64r-neural-hybrid"
+kind              = "neural"
+rounds            = 64
+num_pairs         = 8
+checkpoint        = "checkpoints/d64.pt"
+beam_width        = 16
+neural_target_bits = 32
+sat_timeout_s     = 120.0
+max_backtracks    = 16
+
+[[run]]
+name              = "64r-sat-pure"
+kind              = "sat"
+rounds            = 64
+num_pairs         = 4
+hint_bits         = 0
+encoder           = "xor"
+solver            = "cryptominisat"
+timeout_s         = 300.0
+
+[[run]]
+name              = "96r-neural-hybrid"
+kind              = "neural"
+rounds            = 96
+num_pairs         = 8
+checkpoint        = "checkpoints/d96.pt"
+beam_width        = 16
+neural_target_bits = 64
+sat_timeout_s     = 300.0
+max_backtracks    = 16
+
+[[run]]
+name              = "128r-neural-hybrid"
+kind              = "neural"
+rounds            = 128
+num_pairs         = 8
+checkpoint        = "checkpoints/d128.pt"
+beam_width        = 32
+neural_target_bits = 96
+sat_timeout_s     = 600.0
+max_backtracks    = 16
