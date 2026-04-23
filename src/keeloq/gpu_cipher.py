@@ -7,6 +7,7 @@ dimension is what gets parallelized, not the bits within one encryption.
 Note: CUDA does not support shift operators on uint32, so we work internally
 with int64 and mask to 32 bits. The public API still accepts/returns uint32.
 """
+
 from __future__ import annotations
 
 import torch
@@ -31,12 +32,24 @@ def _get_bit(state: torch.Tensor, msb_pos: int, width: int = 32) -> torch.Tensor
     return (state >> (width - 1 - msb_pos)) & 1
 
 
-def _core(a: torch.Tensor, b: torch.Tensor, c: torch.Tensor, d: torch.Tensor,
-          e: torch.Tensor) -> torch.Tensor:
+def _core(
+    a: torch.Tensor, b: torch.Tensor, c: torch.Tensor, d: torch.Tensor, e: torch.Tensor
+) -> torch.Tensor:
     """Batched KeeLoq NLF. Inputs are 0/1 int64 tensors of identical shape."""
-    return (d ^ e
-            ^ (a & c) ^ (a & e) ^ (b & c) ^ (b & e) ^ (c & d) ^ (d & e)
-            ^ (a & d & e) ^ (a & c & e) ^ (a & b & d) ^ (a & b & c))
+    return (
+        d
+        ^ e
+        ^ (a & c)
+        ^ (a & e)
+        ^ (b & c)
+        ^ (b & e)
+        ^ (c & d)
+        ^ (d & e)
+        ^ (a & d & e)
+        ^ (a & c & e)
+        ^ (a & b & d)
+        ^ (a & b & c)
+    )
 
 
 def encrypt_batch(

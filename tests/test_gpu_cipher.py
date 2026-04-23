@@ -1,4 +1,5 @@
 """Tests for keeloq.gpu_cipher bit-sliced CUDA cipher."""
+
 from __future__ import annotations
 
 import pytest
@@ -24,16 +25,20 @@ def test_gpu_matches_cpu_random_batch(rounds: int) -> None:
     keys_hi_cpu = torch.randint(0, 1 << 32, (n,), generator=gen, dtype=torch.int64)
 
     plaintexts = plaintexts_cpu.to(dtype=torch.uint32, device="cuda")
-    keys = torch.stack([keys_lo_cpu.to(dtype=torch.uint32),
-                        keys_hi_cpu.to(dtype=torch.uint32)], dim=1).to("cuda")
+    keys = torch.stack(
+        [keys_lo_cpu.to(dtype=torch.uint32), keys_hi_cpu.to(dtype=torch.uint32)], dim=1
+    ).to("cuda")
 
     gpu_out = encrypt_batch(plaintexts, keys, rounds=rounds).cpu().tolist()
 
     for i in range(n):
         pt = int(plaintexts_cpu[i].item()) & 0xFFFFFFFF
-        k = (int(keys_hi_cpu[i].item()) & 0xFFFFFFFF) << 32 | (int(keys_lo_cpu[i].item()) & 0xFFFFFFFF)
-        assert gpu_out[i] == cpu_encrypt(pt, k, rounds), \
+        k = (int(keys_hi_cpu[i].item()) & 0xFFFFFFFF) << 32 | (
+            int(keys_lo_cpu[i].item()) & 0xFFFFFFFF
+        )
+        assert gpu_out[i] == cpu_encrypt(pt, k, rounds), (
             f"mismatch at i={i}: pt=0x{pt:08x} key=0x{k:016x} rounds={rounds}"
+        )
 
 
 def test_gpu_cipher_raises_without_cuda(monkeypatch: pytest.MonkeyPatch) -> None:
