@@ -50,7 +50,10 @@ markers = [
     "solver_minisat: requires the minisat binary on PATH",
     "slow: end-to-end attack tests; excluded from -m 'not slow' runs",
 ]
-filterwarnings = ["error"]
+filterwarnings = [
+    "error",
+    "ignore:Failed to initialize NumPy:UserWarning",
+]
 
 [tool.ruff]
 line-length = 100
