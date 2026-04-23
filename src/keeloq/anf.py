@@ -71,3 +71,27 @@ def one() -> BoolPoly:
 
 def var(name: str) -> BoolPoly:
     return BoolPoly(frozenset([frozenset([name])]))
+
+
+def variables(rounds: int, num_pairs: int = 1) -> list[str]:
+    """Return the ordered list of all ANF variables.
+
+    Layout: K0..K63, then for each pair p in 0..num_pairs-1:
+        A0_p, A1_p, ..., A{rounds-1}_p,
+        B0_p, B1_p, ..., B{rounds-1}_p,
+        L0_p, L1_p, ..., L{rounds+31}_p.
+
+    Keys are shared across pairs (single underlying key). L/A/B are per-pair
+    because the state evolution depends on which plaintext was encrypted.
+    """
+    if rounds < 0:
+        raise ValueError(f"rounds={rounds} is negative")
+    if num_pairs < 1:
+        raise ValueError(f"num_pairs={num_pairs} must be >= 1")
+
+    out = [f"K{i}" for i in range(64)]
+    for p in range(num_pairs):
+        out += [f"A{i}_p{p}" for i in range(rounds)]
+        out += [f"B{i}_p{p}" for i in range(rounds)]
+        out += [f"L{i}_p{p}" for i in range(rounds + 32)]
+    return out
