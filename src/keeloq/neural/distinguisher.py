@@ -8,7 +8,8 @@ probability of the "real" label.
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
 
 import torch
 from torch import nn
@@ -178,3 +179,35 @@ def train(cfg: TrainingConfig) -> tuple[Distinguisher, TrainingResult]:
         config=cfg,
         history=history,
     )
+
+
+def save_checkpoint(model: Distinguisher, result: TrainingResult, path: Path | str) -> None:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "state_dict": {k: v.cpu() for k, v in model.state_dict().items()},
+        "config": asdict(result.config),
+        "result": {
+            "final_loss": result.final_loss,
+            "final_val_accuracy": result.final_val_accuracy,
+            "wall_time_s": result.wall_time_s,
+            "history": list(result.history),
+        },
+    }
+    torch.save(payload, path)
+
+
+def load_checkpoint(path: Path | str) -> tuple[Distinguisher, TrainingResult]:
+    payload = torch.load(Path(path), map_location="cuda", weights_only=False)
+    cfg = TrainingConfig(**payload["config"])
+    model = Distinguisher(depth=cfg.depth, width=cfg.width).cuda()
+    model.load_state_dict(payload["state_dict"])
+    r = payload["result"]
+    result = TrainingResult(
+        final_loss=r["final_loss"],
+        final_val_accuracy=r["final_val_accuracy"],
+        wall_time_s=r["wall_time_s"],
+        config=cfg,
+        history=r["history"],
+    )
+    return model, result
