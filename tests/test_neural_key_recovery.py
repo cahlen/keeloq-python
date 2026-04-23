@@ -47,20 +47,29 @@ def test_wrong_key_bit_disagrees() -> None:
 
 
 @pytest.mark.gpu
-def test_recover_prefix_toy_8_rounds() -> None:
-    """With a tiny trained distinguisher at 8 rounds, recover the first 4
-    key bits (rounds 4-7) from synthetic pairs."""
+def test_recover_prefix_gohr_pattern() -> None:
+    """Gohr-style toy attack: train a distinguisher at depth D, attack a cipher
+    at depth D+K by peeling K rounds back down to the trained depth.
+
+    A single distinguisher trained at depth N doesn't generalize to (N-k)-round
+    pairs, so the Gohr attack peels rounds from an M-round ciphertext until the
+    residual depth matches the trained distinguisher. Here we train at D=4 and
+    attack depth D+K=6 by peeling K=2 rounds, so the final scored pairs are at
+    depth 4 — the distinguisher's trained depth.
+    """
     from keeloq.gpu_cipher import encrypt_batch
     from keeloq.neural.distinguisher import TrainingConfig, train
     from keeloq.neural.key_recovery import recover_prefix
 
+    # Train a distinguisher AT depth 4 (not at the attack depth).
     delta = 0x80000000
+    trained_depth = 4
     cfg = TrainingConfig(
-        rounds=8,
+        rounds=trained_depth,
         delta=delta,
-        n_samples=60_000,
+        n_samples=80_000,
         batch_size=1024,
-        epochs=3,
+        epochs=4,
         lr=2e-3,
         weight_decay=1e-5,
         seed=0,
@@ -68,10 +77,17 @@ def test_recover_prefix_toy_8_rounds() -> None:
         width=16,
     )
     model, result = train(cfg)
-    assert result.final_val_accuracy >= 0.75
+    # Very shallow KeeLoq is easy — accuracy should be high.
+    assert result.final_val_accuracy >= 0.85, (
+        f"4-round distinguisher only reached {result.final_val_accuracy:.3f}"
+    )
+
+    # Attack a depth-6 cipher by peeling 2 rounds back to depth 4.
+    attack_depth = 6
+    bits_to_recover = attack_depth - trained_depth  # = 2
 
     target_key = 0xDEADBEEF_CAFE1234 & ((1 << 64) - 1)
-    n_pairs = 128
+    n_pairs = 256
     gen = torch.Generator(device="cpu").manual_seed(2024)
     pts0 = torch.randint(0, 1 << 32, (n_pairs,), generator=gen, dtype=torch.int64).to(
         dtype=torch.uint32, device="cuda"
@@ -87,8 +103,8 @@ def test_recover_prefix_toy_8_rounds() -> None:
         dtype=torch.uint32,
         device="cuda",
     )
-    c0 = encrypt_batch(pts0, keys, rounds=8)
-    c1 = encrypt_batch(pts1, keys, rounds=8)
+    c0 = encrypt_batch(pts0, keys, rounds=attack_depth)
+    c1 = encrypt_batch(pts1, keys, rounds=attack_depth)
     pairs = [
         (int(c0[i].item()) & 0xFFFFFFFF, int(c1[i].item()) & 0xFFFFFFFF) for i in range(n_pairs)
     ]
@@ -96,8 +112,8 @@ def test_recover_prefix_toy_8_rounds() -> None:
     rec = recover_prefix(
         pairs=pairs,
         distinguisher=model,
-        starting_rounds=8,
-        max_bits_to_recover=4,
+        starting_rounds=attack_depth,
+        max_bits_to_recover=bits_to_recover,
         beam_width=4,
     )
     for bit_idx, recovered_val in rec.recovered_bits.items():
