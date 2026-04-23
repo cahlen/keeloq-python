@@ -71,3 +71,7 @@ files = ["src/keeloq"]
 [[tool.mypy.overrides]]
 module = "tests.*"
 disallow_untyped_defs = false
+
+[[tool.mypy.overrides]]
+module = "pycryptosat"
+ignore_missing_imports = true
