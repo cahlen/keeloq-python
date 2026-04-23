@@ -2,7 +2,7 @@
 
 Runs three sub-experiments to test whether the kernel-size-3 spatial-conv
 DistinguisherSpatial architecture surfaces signal at depths that collapsed
-with the v1 1×1-conv Distinguisher:
+with the v1 1x1-conv Distinguisher:
 
   1. Δ search at depth 56 (control — should reproduce v1's signal,
      confirming v2 isn't broken).
@@ -27,7 +27,6 @@ from keeloq.neural.data import generate_pairs
 from keeloq.neural.differences import _default_candidate_set
 from keeloq.neural.distinguisher_v2 import DistinguisherSpatial
 
-
 # ---------- Standalone training loop (uses v2 architecture) ----------
 
 
@@ -42,14 +41,23 @@ def _set_seeds(seed: int) -> None:
     random.seed(seed)
 
 
-def _val_accuracy(model: nn.Module, rounds: int, delta: int, seed: int,
-                  n_samples: int = 5000, batch_size: int = 1024) -> float:
+def _val_accuracy(
+    model: nn.Module,
+    rounds: int,
+    delta: int,
+    seed: int,
+    n_samples: int = 5000,
+    batch_size: int = 1024,
+) -> float:
     model.train(False)
     correct, total = 0, 0
     with torch.no_grad():
         for batch in generate_pairs(
-            rounds=rounds, delta=delta, n_samples=n_samples,
-            seed=seed, batch_size=min(batch_size, n_samples),
+            rounds=rounds,
+            delta=delta,
+            n_samples=n_samples,
+            seed=seed,
+            batch_size=min(batch_size, n_samples),
         ):
             preds = (model(batch.pairs) >= 0.5).float()
             correct += (preds == batch.labels).sum().item()
@@ -84,8 +92,11 @@ def train_v2(
     for epoch in range(epochs):
         loss_sum, n_batches = 0.0, 0
         for batch in generate_pairs(
-            rounds=rounds, delta=delta, n_samples=n_samples,
-            seed=seed + epoch * 991, batch_size=batch_size,
+            rounds=rounds,
+            delta=delta,
+            n_samples=n_samples,
+            seed=seed + epoch * 991,
+            batch_size=batch_size,
         ):
             opt.zero_grad()
             preds = model(batch.pairs)
@@ -96,11 +107,13 @@ def train_v2(
             loss_sum += float(loss.item())
             n_batches += 1
         val_acc = _val_accuracy(model, rounds, delta, seed=seed + 1_000_000)
-        history.append({
-            "epoch": epoch,
-            "train_loss": loss_sum / max(1, n_batches),
-            "val_accuracy": val_acc,
-        })
+        history.append(
+            {
+                "epoch": epoch,
+                "train_loss": loss_sum / max(1, n_batches),
+                "val_accuracy": val_acc,
+            }
+        )
     return model, {
         "final_loss": history[-1]["train_loss"],
         "final_val_accuracy": history[-1]["val_accuracy"],
@@ -134,17 +147,25 @@ def search_delta_v2(
     results = []
     for i, delta in enumerate(uniq):
         _, res = train_v2(
-            rounds=rounds, delta=delta,
-            n_samples=tiny_budget_samples, batch_size=1024,
-            epochs=tiny_budget_epochs, lr=2e-3, weight_decay=1e-5,
-            seed=seed + i * 7919, depth=depth, width=width,
+            rounds=rounds,
+            delta=delta,
+            n_samples=tiny_budget_samples,
+            batch_size=1024,
+            epochs=tiny_budget_epochs,
+            lr=2e-3,
+            weight_decay=1e-5,
+            seed=seed + i * 7919,
+            depth=depth,
+            width=width,
             kernel_size=kernel_size,
         )
-        results.append({
-            "delta": delta,
-            "val_accuracy": res["final_val_accuracy"],
-            "training_loss_final": res["final_loss"],
-        })
+        results.append(
+            {
+                "delta": delta,
+                "val_accuracy": res["final_val_accuracy"],
+                "training_loss_final": res["final_loss"],
+            }
+        )
     results.sort(key=lambda c: c["val_accuracy"], reverse=True)
     return results
 
@@ -166,12 +187,16 @@ def main() -> None:
     cands_56 = search_delta_v2(rounds=56, tiny_budget_samples=100_000, tiny_budget_epochs=2, seed=0)
     elapsed_56 = time.perf_counter() - t0
     best_56 = cands_56[0]
-    lines.append(f"## Control: Δ search at depth 56 (v1 got best 0.688)\n")
+    lines.append("## Control: Δ search at depth 56 (v1 got best 0.688)\n")
     lines.append(f"Wall clock: {elapsed_56:.1f}s — top 5:\n")
     lines.append("| Δ | val_acc | loss |\n|---|---:|---:|")
     for c in cands_56[:5]:
-        lines.append(f"| 0x{c['delta']:08x} | {c['val_accuracy']:.4f} | {c['training_loss_final']:.4f} |")
-    print(json.dumps({"experiment": "control_56", "best": best_56, "wall_s": elapsed_56}), flush=True)
+        lines.append(
+            f"| 0x{c['delta']:08x} | {c['val_accuracy']:.4f} | {c['training_loss_final']:.4f} |"
+        )
+    print(
+        json.dumps({"experiment": "control_56", "best": best_56, "wall_s": elapsed_56}), flush=True
+    )
 
     # Experiment 2: Δ search at depth 88 (primary hypothesis).
     print("\n[v2-exp] Δ search at depth 88 (primary hypothesis)...", flush=True)
@@ -179,44 +204,65 @@ def main() -> None:
     cands_88 = search_delta_v2(rounds=88, tiny_budget_samples=100_000, tiny_budget_epochs=2, seed=0)
     elapsed_88 = time.perf_counter() - t0
     best_88 = cands_88[0]
-    lines.append(f"\n## Primary: Δ search at depth 88 (v1 all < 0.517)\n")
+    lines.append("\n## Primary: Δ search at depth 88 (v1 all < 0.517)\n")
     lines.append(f"Wall clock: {elapsed_88:.1f}s — top 10:\n")
     lines.append("| Δ | val_acc | loss |\n|---|---:|---:|")
     for c in cands_88[:10]:
-        lines.append(f"| 0x{c['delta']:08x} | {c['val_accuracy']:.4f} | {c['training_loss_final']:.4f} |")
-    print(json.dumps({"experiment": "primary_88", "best": best_88, "wall_s": elapsed_88}), flush=True)
+        lines.append(
+            f"| 0x{c['delta']:08x} | {c['val_accuracy']:.4f} | {c['training_loss_final']:.4f} |"
+        )
+    print(
+        json.dumps({"experiment": "primary_88", "best": best_88, "wall_s": elapsed_88}), flush=True
+    )
 
     # Experiment 3 (conditional): Δ search at depth 120.
     print("\n[v2-exp] Δ search at depth 120 (stretch)...", flush=True)
     t0 = time.perf_counter()
-    cands_120 = search_delta_v2(rounds=120, tiny_budget_samples=100_000, tiny_budget_epochs=2, seed=0)
+    cands_120 = search_delta_v2(
+        rounds=120, tiny_budget_samples=100_000, tiny_budget_epochs=2, seed=0
+    )
     elapsed_120 = time.perf_counter() - t0
     best_120 = cands_120[0]
-    lines.append(f"\n## Stretch: Δ search at depth 120 (v1 all < 0.515)\n")
+    lines.append("\n## Stretch: Δ search at depth 120 (v1 all < 0.515)\n")
     lines.append(f"Wall clock: {elapsed_120:.1f}s — top 10:\n")
     lines.append("| Δ | val_acc | loss |\n|---|---:|---:|")
     for c in cands_120[:10]:
-        lines.append(f"| 0x{c['delta']:08x} | {c['val_accuracy']:.4f} | {c['training_loss_final']:.4f} |")
-    print(json.dumps({"experiment": "stretch_120", "best": best_120, "wall_s": elapsed_120}), flush=True)
+        lines.append(
+            f"| 0x{c['delta']:08x} | {c['val_accuracy']:.4f} | {c['training_loss_final']:.4f} |"
+        )
+    print(
+        json.dumps({"experiment": "stretch_120", "best": best_120, "wall_s": elapsed_120}),
+        flush=True,
+    )
 
     # Experiment 4 (conditional): if depth 88 has signal, full train.
     verdict_lines: list[str] = []
-    verdict_lines.append(f"\n## Verdict\n")
+    verdict_lines.append("\n## Verdict\n")
     if best_88["val_accuracy"] >= SIGNAL_THRESHOLD:
         verdict_lines.append(
             f"- Depth 88 best Δ=0x{best_88['delta']:08x} reached val-acc "
             f"{best_88['val_accuracy']:.4f} — **above the {SIGNAL_THRESHOLD} threshold**. "
-            "Spatial conv architecture surfaces signal where v1's 1×1 version failed. "
+            "Spatial conv architecture surfaces signal where v1's 1x1 version failed. "
             "Proceeding with a full-scale train at this Δ.\n"
         )
-        print(f"\n[v2-exp] Depth 88 signal confirmed ({best_88['val_accuracy']:.4f}). "
-              "Kicking off full train (10M samples × 20 epochs)...", flush=True)
+        print(
+            f"\n[v2-exp] Depth 88 signal confirmed ({best_88['val_accuracy']:.4f}). "
+            "Kicking off full train (10M samples x 20 epochs)...",
+            flush=True,
+        )
         t0 = time.perf_counter()
         _, full_res = train_v2(
-            rounds=88, delta=best_88["delta"],
-            n_samples=10_000_000, batch_size=4096,
-            epochs=20, lr=2e-3, weight_decay=1e-5,
-            seed=1729, depth=5, width=256, kernel_size=3,
+            rounds=88,
+            delta=best_88["delta"],
+            n_samples=10_000_000,
+            batch_size=4096,
+            epochs=20,
+            lr=2e-3,
+            weight_decay=1e-5,
+            seed=1729,
+            depth=5,
+            width=256,
+            kernel_size=3,
         )
         verdict_lines.append(
             f"- Full train: val_acc={full_res['final_val_accuracy']:.4f}, "
@@ -230,7 +276,7 @@ def main() -> None:
             f"{best_88['val_accuracy']:.4f} — **below the {SIGNAL_THRESHOLD} threshold**. "
             "Spatial conv architecture *also* fails to surface signal at depth 88. "
             "This tightens the negative result from 'v1 architecture fails' to "
-            "'both 1×1 and spatial 3-tap architectures fail' — suggesting the "
+            "'both 1x1 and spatial 3-tap architectures fail' — suggesting the "
             "signal horizon is a genuine property of KeeLoq's diffusion at these "
             "depths, not an artifact of any one architecture.\n"
         )

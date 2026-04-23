@@ -3,7 +3,7 @@ and 88 (known collapse).
 
 Tests three promising Δs (the top-3 from the depth-56 search) at six depths:
 60, 64, 68, 72, 76, 80. Each run is a tiny-budget training (100 k samples
-× 2 epochs). Total: 18 runs, ~10–15 min on a 5090.
+x 2 epochs). Total: 18 runs, ~10-15 min on a 5090.
 
 Outputs: docs/phase3b-results/horizon_probe.md with a per-depth-per-Δ table
 plus a "deepest viable depth" recommendation.
@@ -20,7 +20,6 @@ from pathlib import Path
 
 from keeloq.neural.distinguisher import TrainingConfig, train
 
-
 # The three Δs that reached val-acc ≥ 0.65 at depth 56 (from delta_search.md).
 PROBE_DELTAS = [0x00000002, 0x00010000, 0x00800000]
 PROBE_DEPTHS = [60, 64, 68, 72, 76, 80]
@@ -33,8 +32,11 @@ VIABILITY_THRESHOLD = 0.55
 
 def probe() -> dict:
     print("=" * 70, flush=True)
-    print(f"Horizon probe: depths {PROBE_DEPTHS} × Δs {[f'0x{d:08x}' for d in PROBE_DELTAS]}", flush=True)
-    print(f"Budget: 100 000 samples × 2 epochs per cell (depth=2, width=16)", flush=True)
+    print(
+        f"Horizon probe: depths {PROBE_DEPTHS} x Δs {[f'0x{d:08x}' for d in PROBE_DELTAS]}",
+        flush=True,
+    )
+    print("Budget: 100 000 samples x 2 epochs per cell (depth=2, width=16)", flush=True)
     print("=" * 70, flush=True)
 
     results: dict[int, dict[int, float]] = {}
@@ -61,7 +63,10 @@ def probe() -> dict:
             acc = res.final_val_accuracy
             elapsed = time.perf_counter() - t0
             results[depth][delta] = acc
-            print(f"  depth={depth:3d}  Δ=0x{delta:08x}  val_acc={acc:.4f}  loss={res.final_loss:.4f}  ({elapsed:.1f}s)", flush=True)
+            print(
+                f"  depth={depth:3d}  Δ=0x{delta:08x}  val_acc={acc:.4f}  loss={res.final_loss:.4f}  ({elapsed:.1f}s)",
+                flush=True,
+            )
 
     print("=" * 70, flush=True)
     print(f"Probe complete in {time.perf_counter() - t_all:.1f}s", flush=True)
@@ -70,9 +75,7 @@ def probe() -> dict:
 
 def analyze(results: dict) -> dict:
     # Max accuracy achieved at each depth across all tested Δs:
-    per_depth_best = {
-        depth: max(cells.values()) for depth, cells in results.items()
-    }
+    per_depth_best = {depth: max(cells.values()) for depth, cells in results.items()}
     # Deepest depth that crossed the viability threshold at any Δ:
     viable_depths = [d for d, acc in per_depth_best.items() if acc >= VIABILITY_THRESHOLD]
     deepest_viable = max(viable_depths) if viable_depths else None
@@ -93,7 +96,7 @@ def write_markdown(results: dict, summary: dict, out: Path) -> None:
     lines.append(
         "Tests the signal cliff between depth 56 (known signal, d64.pt "
         f"trained here) and depth 88 (known collapse). Budget per cell: "
-        f"100 k samples × 2 epochs, depth-2/width-16 tiny model. Viability "
+        f"100 k samples x 2 epochs, depth-2/width-16 tiny model. Viability "
         f"threshold: val_acc ≥ {VIABILITY_THRESHOLD}.\n"
     )
     lines.append("## Results (val-accuracy at tiny-budget training)\n")
@@ -135,15 +138,21 @@ def main() -> None:
     results = probe()
     summary = analyze(results)
     print("\nSummary:", flush=True)
-    print(json.dumps({
-        "per_depth_best": {str(k): v for k, v in summary["per_depth_best"].items()},
-        "deepest_viable_depth": summary["deepest_viable_depth"],
-        "best_delta_at_deepest": (
-            f"0x{summary['best_delta_at_deepest']:08x}"
-            if summary["best_delta_at_deepest"] is not None
-            else None
+    print(
+        json.dumps(
+            {
+                "per_depth_best": {str(k): v for k, v in summary["per_depth_best"].items()},
+                "deepest_viable_depth": summary["deepest_viable_depth"],
+                "best_delta_at_deepest": (
+                    f"0x{summary['best_delta_at_deepest']:08x}"
+                    if summary["best_delta_at_deepest"] is not None
+                    else None
+                ),
+            },
+            indent=2,
         ),
-    }, indent=2), flush=True)
+        flush=True,
+    )
 
     out = Path("docs/phase3b-results/horizon_probe.md")
     write_markdown(results, summary, out)

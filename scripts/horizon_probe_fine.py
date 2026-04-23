@@ -1,7 +1,7 @@
 """Fine-grained horizon probe at depths 57, 58, 59 (between known-signal 56
 and probe-collapsed 60).
 
-If any cell at depths 57–59 crosses the viability threshold (0.55), full-scale
+If any cell at depths 57-59 crosses the viability threshold (0.55), full-scale
 training at that (depth, Δ) would give us a distinguisher for attacks at
 ~(depth + 8) rounds, pushing the coverage table past d64.pt.
 
@@ -15,7 +15,6 @@ import time
 from pathlib import Path
 
 from keeloq.neural.distinguisher import TrainingConfig, train
-
 
 # Top-8 Δs from the depth-56 search (val-acc ≥ 0.62).
 FINE_DELTAS = [
@@ -34,7 +33,7 @@ VIABILITY_THRESHOLD = 0.55
 
 def probe() -> dict:
     print("=" * 70, flush=True)
-    print(f"Fine horizon probe: depths {FINE_DEPTHS} × top-8 Δs from depth-56 search", flush=True)
+    print(f"Fine horizon probe: depths {FINE_DEPTHS} x top-8 Δs from depth-56 search", flush=True)
     print("=" * 70, flush=True)
     results: dict[int, dict[int, float]] = {}
     t_all = time.perf_counter()
@@ -43,9 +42,17 @@ def probe() -> dict:
         results[depth] = {}
         for delta in FINE_DELTAS:
             cfg = TrainingConfig(
-                rounds=depth, delta=delta, n_samples=100_000,
-                batch_size=1024, epochs=2, lr=2e-3, weight_decay=1e-5,
-                seed=0, depth=2, width=16, val_samples=5000,
+                rounds=depth,
+                delta=delta,
+                n_samples=100_000,
+                batch_size=1024,
+                epochs=2,
+                lr=2e-3,
+                weight_decay=1e-5,
+                seed=0,
+                depth=2,
+                width=16,
+                val_samples=5000,
             )
             _, res = train(cfg)
             acc = res.final_val_accuracy
@@ -72,7 +79,7 @@ def main() -> None:
     out = Path("docs/phase3b-results/horizon_probe_fine.md")
     lines = ["# Phase 3b Horizon Probe — Fine-Grained (57, 58, 59)\n"]
     lines.append(
-        f"Top-8 Δs from depth-56 search, 100 k samples × 2 epochs. "
+        f"Top-8 Δs from depth-56 search, 100 k samples x 2 epochs. "
         f"Viability threshold: val_acc ≥ {VIABILITY_THRESHOLD}.\n"
     )
     lines.append("## Results\n")

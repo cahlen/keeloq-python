@@ -1,7 +1,7 @@
 """Spatial-convolution variant of the Gohr-style distinguisher for KeeLoq.
 
 Hypothesis under test (see docs/phase3b-results/ambition_outcome.md §"What
-would push the frontier"): the v1 architecture's 1×1 convolutions blind the
+would push the frontier"): the v1 architecture's 1x1 convolutions blind the
 model to bit-neighbor correlations, explaining its signal-horizon collapse
 between depths 56 and 88. This variant reshapes the 64-bit input to
 ``(N, 2, 32)`` — two channels (c₀, c₁) over 32 spatial bit positions — and
@@ -75,9 +75,7 @@ class DistinguisherSpatial(nn.Module):
         super().__init__()
         self.unpack = _BitUnpackSpatial()
         padding = kernel_size // 2
-        self.embed = nn.Conv1d(
-            2, width, kernel_size=kernel_size, padding=padding
-        )
+        self.embed = nn.Conv1d(2, width, kernel_size=kernel_size, padding=padding)
         self.blocks = nn.ModuleList(
             [_ResidualBlockSpatial(width, kernel_size) for _ in range(depth)]
         )
