@@ -73,13 +73,13 @@ A ResNet-1D-CNN distinguisher is trained at a fixed depth **D** (e.g. 56) to sep
 
 Checkpoints are published at [**cahlen/keeloq-neural-distinguishers**](https://huggingface.co/cahlen/keeloq-neural-distinguishers) with a full model card covering training config, eval metrics, architecture, and attack procedure. Current availability:
 
-| File | Trained Depth | Attack Target | Val Accuracy | ROC-AUC |
-|---|---:|---:|---:|---:|
-| `d64.pt` | 56 | 64 rounds | 0.752 | 0.828 |
-| `d96.pt` | 88 | 96 rounds | (coming) | (coming) |
-| `d128.pt` | 120 | 128 rounds | (coming) | (coming) |
+| File | Trained Depth | Attack Target | Val Accuracy | ROC-AUC | Status |
+|---|---:|---:|---:|---:|---|
+| `d64.pt` | 56 | 64 rounds | 0.752 | 0.828 | ✅ viable; used by the 64-round regression test |
+| `d96.pt` | 88 | 96 rounds | 0.500 | 0.508 | ❌ architectural collapse — see [ambition outcome](docs/phase3b-results/ambition_outcome.md) |
+| `d128.pt` | 120 | 128 rounds | — | — | ❌ not produced; Δ search also collapsed (see outcome doc) |
 
-Each `.pt` file embeds its full `TrainingConfig`, so results are reproducible from seed alone.
+Each `.pt` file embeds its full `TrainingConfig`, so results are reproducible from seed alone. The d96/d128 collapse is an architectural finding — the 1×1-conv depth-5 width-512 ResNet has a signal horizon somewhere between depth 56 and 88 on KeeLoq. See [`docs/phase3b-results/ambition_outcome.md`](docs/phase3b-results/ambition_outcome.md) for the full analysis, diagnostic tables, and proposed architectural directions that would push the frontier.
 
 ## Pipeline composition via Unix pipes
 

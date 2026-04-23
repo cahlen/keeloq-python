@@ -1,0 +1,1 @@
+{"rounds": 88, "delta": 2, "n_samples": 1000000, "accuracy": 0.5, "roc_auc": 0.508168675492, "tpr_at_fpr_01": 0.0, "confusion": [0, 500000, 0, 500000]}
