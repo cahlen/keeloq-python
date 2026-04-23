@@ -32,14 +32,6 @@ def core(a: int, b: int, c: int, d: int, e: int) -> int:
     ) % 2
 
 
-def _bit(value: int, position: int) -> int:
-    """Return bit at `position` of `value`, where position 0 is the MSB for the
-    state (matching the 2015 scripts' `list(PLAINTEXT)[0]` semantics)."""
-    # For the state (32 bits), position 0 is MSB: bit_index_from_lsb = 31 - position
-    # This helper works for any bit-width because callers convert consistently.
-    return (value >> position) & 1
-
-
 def _state_bit(state: int, position: int, width: int = 32) -> int:
     """Get MSB-indexed bit `position` out of `width`-bit `state`."""
     return (state >> (width - 1 - position)) & 1

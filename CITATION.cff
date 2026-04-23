@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+message: "If you use this software in research, please cite it as below."
+title: "keeloq-python: Algebraic + neural differential cryptanalysis of reduced-round KeeLoq"
+abstract: >-
+  A 2026 Python 3 modernization of a 2015 SAT-based cryptanalysis project against the
+  KeeLoq block cipher. Ships two pipelines: an XOR-aware ANF encoder + CryptoMiniSat
+  algebraic attack that recovers a 64-bit key at 64 rounds with 4 plaintext pairs and
+  zero hints in under a second on an RTX 5090 (vs. 14 hours for the 2015 baseline at
+  160 rounds / 25 hints / 2 pairs), and a Gohr-style PyTorch ResNet-1D-CNN neural
+  differential distinguisher hybridized with the SAT pipeline via Bayesian
+  one-bit-per-round key recovery. Includes a documented negative-result analysis of
+  the distinguisher's architectural signal horizon on deeper-round KeeLoq.
+authors:
+  - family-names: Humphreys
+    given-names: Cahlen
+    alias: cahlen
+type: software
+license: MIT
+repository-code: "https://github.com/cahlen/keeloq-python"
+url: "https://github.com/cahlen/keeloq-python"
+keywords:
+  - cryptanalysis
+  - keeloq
+  - sat-solver
+  - cryptominisat
+  - differential-cryptanalysis
+  - neural-cryptanalysis
+  - gohr
+  - pytorch
+  - algebraic-cryptanalysis
+year: 2026

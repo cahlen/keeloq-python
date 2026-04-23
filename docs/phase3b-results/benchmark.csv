@@ -1,0 +1,6 @@
+name,kind,rounds,num_pairs,checkpoint,status,wall_time_s,bits_recovered_neurally,neural_wall_time_s,sat_wall_time_s,num_vars,num_clauses,num_xors
+64r-neural-hybrid-K8,neural,64,8,checkpoints/d64.pt,SUCCESS,0.854,8,0.633,0.220,0,0,0
+64r-neural-hybrid-K32-over-aggressive,neural,64,8,checkpoints/d64.pt,BACKTRACK_EXHAUSTED,12.810,32,11.899,0.911,0,0,0
+64r-sat-pure,sat,64,4,,SUCCESS,0.255,0,0.000,0.245,3776,8448,1024
+96r-neural-hybrid-UNAVAILABLE,neural,96,8,checkpoints/d96.pt,SKIP_MISSING_CHECKPOINT,0.000,0,0.000,0.000,0,0,0
+128r-neural-hybrid-UNAVAILABLE,neural,128,8,checkpoints/d128.pt,SKIP_MISSING_CHECKPOINT,0.000,0,0.000,0.000,0,0,0
