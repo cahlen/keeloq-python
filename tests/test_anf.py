@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from keeloq.anf import BoolPoly, one, round_equations, var, variables, zero
+from keeloq.anf import BoolPoly, one, round_equations, system, var, variables, zero
+from keeloq.cipher import encrypt
 
 
 def test_zero_is_empty() -> None:
@@ -172,3 +173,96 @@ def test_round_equation_pair_index_changes_names() -> None:
     # K variables still shared
     assert "K0" in eq1_p0.variables()
     assert "K0" in eq1_p1.variables()
+
+
+def test_system_size_single_pair_no_hints() -> None:
+    rounds = 4
+    pt, ct = 0xDEADBEEF, 0
+    sys = system(rounds=rounds, pairs=[(pt, ct)], key_hints=None)
+    # Expected: 32 plaintext bindings + 32 ciphertext bindings + 3*rounds round equations
+    assert len(sys) == 32 + 32 + 3*rounds
+
+
+def test_system_size_with_hints() -> None:
+    rounds = 4
+    sys = system(rounds=rounds, pairs=[(0, 0)], key_hints={0: 1, 5: 0, 10: 1})
+    assert len(sys) == 32 + 32 + 3*rounds + 3
+
+
+def test_system_size_multi_pair() -> None:
+    rounds = 4
+    sys = system(rounds=rounds, pairs=[(0, 0), (1, 1)], key_hints=None)
+    # 2 pairs each contribute 32+32+3*rounds; K-hints are shared (0 here)
+    assert len(sys) == 2 * (32 + 32 + 3*rounds)
+
+
+def test_true_solution_satisfies_every_equation_single_pair() -> None:
+    """The cornerstone test: generated equations are correct iff the true
+    (key, L-values, A-values, B-values) zero every polynomial in the system."""
+    rounds = 16
+    pt = 0xCAFEBABE
+    key = 0x0123_4567_89AB_CDEF
+    ct = encrypt(pt, key, rounds)
+
+    sys = system(rounds=rounds, pairs=[(pt, ct)], key_hints=None)
+    assignment = _derive_true_assignment(pt, ct, key, rounds, pair_idx=0)
+    for idx, poly in enumerate(sys):
+        assert poly.substitute(assignment) == 0, \
+            f"equation {idx} not satisfied: vars={poly.variables()}"
+
+
+def test_true_solution_satisfies_multi_pair() -> None:
+    rounds = 16
+    key = 0x0123_4567_89AB_CDEF
+    pairs_plain = [0xCAFEBABE, 0xDEADBEEF, 0x13579BDF]
+    pairs = [(p, encrypt(p, key, rounds)) for p in pairs_plain]
+
+    sys = system(rounds=rounds, pairs=pairs, key_hints=None)
+    assignment: dict[str, int] = {}
+    for p_idx, (pt, ct) in enumerate(pairs):
+        assignment.update(_derive_true_assignment(pt, ct, key, rounds, pair_idx=p_idx))
+    # K variables only need to be added once (shared across pairs)
+    for bit_idx in range(64):
+        assignment.setdefault(f"K{bit_idx}", (key >> (63 - bit_idx)) & 1)
+
+    for idx, poly in enumerate(sys):
+        assert poly.substitute(assignment) == 0, f"equation {idx} unsatisfied"
+
+
+def _derive_true_assignment(pt: int, ct: int, key: int, rounds: int,
+                             pair_idx: int) -> dict[str, int]:
+    """Run the cipher and record every L/A/B intermediate value + K bits."""
+    from keeloq.cipher import _key_bit, _state_bit, core
+
+    assignment: dict[str, int] = {}
+    for bit_idx in range(64):
+        assignment[f"K{bit_idx}"] = _key_bit(key, bit_idx)
+
+    state = pt
+    # L0..L31 are plaintext bits (MSB-first)
+    for bit_idx in range(32):
+        assignment[f"L{bit_idx}_p{pair_idx}"] = _state_bit(pt, bit_idx)
+
+    for i in range(rounds):
+        # Capture A_i = L{i+31}*L{i+26} BEFORE this round's shift
+        # and B_i = L{i+31}*L{i+1}.
+        # Current `state` corresponds to L{i}..L{i+31} mapped MSB-first.
+        l31 = _state_bit(state, 31)
+        l26 = _state_bit(state, 26)
+        l20 = _state_bit(state, 20)
+        l9 = _state_bit(state, 9)
+        l1 = _state_bit(state, 1)
+        l16 = _state_bit(state, 16)
+        l0 = _state_bit(state, 0)
+
+        assignment[f"A{i}_p{pair_idx}"] = (l31 * l26) % 2
+        assignment[f"B{i}_p{pair_idx}"] = (l31 * l1) % 2
+
+        kbit = _key_bit(key, i % 64)
+        newb = (kbit + l0 + l16 + core(l31, l26, l20, l9, l1)) % 2
+        state = ((state << 1) & 0xFFFFFFFF) | newb
+        assignment[f"L{i+32}_p{pair_idx}"] = newb
+
+    # Sanity: post-rounds state matches ciphertext
+    assert state == ct, f"cipher reference disagreement: got {state:08x} want {ct:08x}"
+    return assignment

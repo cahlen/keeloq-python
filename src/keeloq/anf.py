@@ -133,3 +133,73 @@ def round_equations(round_idx: int, pair_idx: int = 0) -> tuple[BoolPoly, BoolPo
     eq2 = av + lv(i + 31) * lv(i + 26)
     eq3 = bv + lv(i + 31) * lv(i + 1)
     return eq1, eq2, eq3
+
+
+def system(
+    rounds: int,
+    pairs: list[tuple[int, int]],
+    key_hints: dict[int, int] | None = None,
+) -> list[BoolPoly]:
+    """Generate the full ANF polynomial system.
+
+    For each (plaintext, ciphertext) pair, emits:
+      - 32 plaintext bit bindings: L{j}_p{p} + plaintext_bit_j  (so the equation
+        equals zero iff L{j}_p{p} equals the plaintext bit)
+      - 32 ciphertext bit bindings on the final-round state (L{rounds+j}_p{p})
+      - 3 * rounds round equations
+
+    Additionally emits key-hint bindings K{i} + value for each entry in key_hints.
+
+    Args:
+        rounds: number of KeeLoq rounds (>= 1).
+        pairs: list of (plaintext_int, ciphertext_int) pairs; must have length >= 1.
+        key_hints: optional mapping from key bit index (0..63, MSB-first) to bit value.
+    """
+    if rounds < 1:
+        raise ValueError(f"rounds={rounds} must be >= 1")
+    if not pairs:
+        raise ValueError("pairs must be non-empty")
+    key_hints = key_hints or {}
+    for bit_idx, v in key_hints.items():
+        if not 0 <= bit_idx < 64:
+            raise ValueError(f"key_hints bit index {bit_idx} out of range")
+        if v not in (0, 1):
+            raise ValueError(f"key_hints value {v} for bit {bit_idx} is not a bit")
+
+    out: list[BoolPoly] = []
+
+    for p_idx, (pt, ct) in enumerate(pairs):
+        if not 0 <= pt < (1 << 32):
+            raise ValueError(f"plaintext pair {p_idx}={pt} does not fit in 32 bits")
+        if not 0 <= ct < (1 << 32):
+            raise ValueError(f"ciphertext pair {p_idx}={ct} does not fit in 32 bits")
+
+        # Plaintext bindings: L{j}_p{p_idx} + pt_bit_j = 0  ->  L{j}_p{p_idx} = pt_bit_j
+        for j in range(32):
+            pt_bit = (pt >> (31 - j)) & 1
+            binding = var(f"L{j}_p{p_idx}")
+            if pt_bit:
+                binding = binding + one()
+            out.append(binding)
+
+        # Ciphertext bindings: L{rounds+j}_p{p_idx} + ct_bit_j = 0
+        for j in range(32):
+            ct_bit = (ct >> (31 - j)) & 1
+            binding = var(f"L{rounds + j}_p{p_idx}")
+            if ct_bit:
+                binding = binding + one()
+            out.append(binding)
+
+        # Round equations
+        for i in range(rounds):
+            eq1, eq2, eq3 = round_equations(round_idx=i, pair_idx=p_idx)
+            out.extend([eq1, eq2, eq3])
+
+    # Key hints (shared across pairs)
+    for bit_idx, v in key_hints.items():
+        binding = var(f"K{bit_idx}")
+        if v:
+            binding = binding + one()
+        out.append(binding)
+
+    return out
