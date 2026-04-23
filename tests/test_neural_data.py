@@ -54,3 +54,41 @@ def test_generate_pairs_batch_chunking() -> None:
     assert len(batches) == 4
     total = sum(b.pairs.shape[0] for b in batches)
     assert total == 1024
+
+
+@pytest.mark.gpu
+def test_real_pair_satisfies_delta_invariant() -> None:
+    import torch
+
+    from keeloq.cipher import encrypt as cpu_encrypt
+    from keeloq.neural import data as data_mod
+    from keeloq.neural.data import generate_pairs
+
+    captured: dict[str, list] = {}
+    orig = data_mod.encrypt_batch
+
+    def spy(plaintexts, keys, rounds):
+        captured.setdefault("pts", []).append(plaintexts.clone())
+        captured.setdefault("keys", []).append(keys.clone())
+        return orig(plaintexts, keys, rounds=rounds)
+
+    data_mod.encrypt_batch = spy
+    try:
+        batch = next(
+            iter(generate_pairs(rounds=16, delta=0x0000FFFF, n_samples=128, seed=7, batch_size=128))
+        )
+    finally:
+        data_mod.encrypt_batch = orig
+
+    p0, p1 = captured["pts"][0], captured["pts"][1]
+    half = 64
+    assert torch.all(
+        (p0[:half].to(torch.int64) & 0xFFFFFFFF) ^ (p1[:half].to(torch.int64) & 0xFFFFFFFF)
+        == int(torch.tensor(0x0000FFFF, dtype=torch.uint32).item())
+    )
+
+    p0_0 = int(p0[0].item()) & 0xFFFFFFFF
+    k_lo = int(captured["keys"][0][0, 0].item()) & 0xFFFFFFFF
+    k_hi = int(captured["keys"][0][0, 1].item()) & 0xFFFFFFFF
+    k = (k_hi << 32) | k_lo
+    assert int(batch.pairs[0, 0].item()) & 0xFFFFFFFF == cpu_encrypt(p0_0, k, 16)
