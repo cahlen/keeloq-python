@@ -36,8 +36,7 @@ def _roc_auc(scores: torch.Tensor, labels: torch.Tensor) -> float:
     return (sum_pos_ranks - n_pos * (n_pos + 1) / 2) / (n_pos * n_neg)
 
 
-def _tpr_at_fpr(scores: torch.Tensor, labels: torch.Tensor,
-                fpr_target: float) -> float:
+def _tpr_at_fpr(scores: torch.Tensor, labels: torch.Tensor, fpr_target: float) -> float:
     """Return the TPR when the decision threshold is set so FPR <= fpr_target."""
     scores = scores.cpu()
     labels = labels.cpu()
@@ -64,8 +63,11 @@ def evaluate(
     all_labels: list[torch.Tensor] = []
     with torch.no_grad():
         for batch in generate_pairs(
-            rounds=rounds, delta=delta, n_samples=n_samples,
-            seed=seed, batch_size=batch_size,
+            rounds=rounds,
+            delta=delta,
+            n_samples=n_samples,
+            seed=seed,
+            batch_size=batch_size,
         ):
             all_scores.append(model(batch.pairs).detach())
             all_labels.append(batch.labels.detach())

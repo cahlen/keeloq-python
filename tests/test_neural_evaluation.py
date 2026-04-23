@@ -16,8 +16,7 @@ def test_random_model_accuracy_near_half() -> None:
     from keeloq.neural.evaluation import evaluate
 
     model = Distinguisher(depth=2, width=8).cuda()
-    report = evaluate(model, rounds=8, delta=0x80000000,
-                      n_samples=8192, seed=1)
+    report = evaluate(model, rounds=8, delta=0x80000000, n_samples=8192, seed=1)
     assert 0.45 <= report.accuracy <= 0.55
 
 
@@ -39,10 +38,17 @@ def test_evaluate_after_training_has_signal() -> None:
     from keeloq.neural.evaluation import evaluate
 
     cfg = TrainingConfig(
-        rounds=1, delta=0x80000000, n_samples=20_000, batch_size=512,
-        epochs=2, lr=2e-3, weight_decay=1e-5, seed=0, depth=2, width=16,
+        rounds=1,
+        delta=0x80000000,
+        n_samples=20_000,
+        batch_size=512,
+        epochs=2,
+        lr=2e-3,
+        weight_decay=1e-5,
+        seed=0,
+        depth=2,
+        width=16,
     )
     model, _ = train(cfg)
-    report = evaluate(model, rounds=1, delta=0x80000000,
-                      n_samples=4096, seed=77)
+    report = evaluate(model, rounds=1, delta=0x80000000, n_samples=4096, seed=77)
     assert report.accuracy >= 0.85
