@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import sys
 from dataclasses import asdict
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -310,6 +311,23 @@ def verify(
         typer.echo(f"original_key:  {original_key}")
     typer.echo(f"match: {str(ok).lower()}")
     raise typer.Exit(code=0 if ok else 2)
+
+
+@app.command()
+def benchmark(
+    matrix: Annotated[str, typer.Option(help="Path to benchmark matrix TOML")] =
+        "benchmarks/matrix.toml",
+    out_dir: Annotated[str, typer.Option(help="Output directory")] = "benchmark-results",
+) -> None:
+    """Run the benchmark matrix and write CSV + markdown to an output directory."""
+    from datetime import datetime
+
+    from benchmarks.bench_attack import run_matrix
+
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    out_path = Path(out_dir) / ts
+    run_matrix(Path(matrix), out_path)
+    typer.echo(f"wrote results to {out_path}/")
 
 
 if __name__ == "__main__":

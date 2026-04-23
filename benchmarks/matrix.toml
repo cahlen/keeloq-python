@@ -1,0 +1,70 @@
+# Phase 1 benchmark matrix. Each row runs once.
+# Results write to ./benchmark-results/<timestamp>/{results.csv, summary.md}.
+#
+# Round counts < 64 can only recover key bits K0..K{rounds-1} regardless of
+# hints/pairs (KeeLoq's key schedule cycles at 64), so low-round rows hint the
+# unconstrained range. Multi-pair attacks at rounds >= 64 can recover the full
+# key with zero hints (if enough pairs).
+
+[[run]]
+name = "16r-1pair-48hints-xor-cms"
+rounds = 16
+num_pairs = 1
+hint_bits = 48
+encoder = "xor"
+solver = "cryptominisat"
+timeout_s = 10.0
+
+[[run]]
+name = "32r-1pair-32hints-xor-cms"
+rounds = 32
+num_pairs = 1
+hint_bits = 32
+encoder = "xor"
+solver = "cryptominisat"
+timeout_s = 30.0
+
+[[run]]
+name = "32r-1pair-32hints-cnf-cms"
+rounds = 32
+num_pairs = 1
+hint_bits = 32
+encoder = "cnf"
+solver = "cryptominisat"
+timeout_s = 30.0
+
+[[run]]
+name = "64r-4pair-0hints-xor-cms"
+rounds = 64
+num_pairs = 4
+hint_bits = 0
+encoder = "xor"
+solver = "cryptominisat"
+timeout_s = 300.0
+
+[[run]]
+name = "64r-4pair-0hints-cnf-cms"
+rounds = 64
+num_pairs = 4
+hint_bits = 0
+encoder = "cnf"
+solver = "cryptominisat"
+timeout_s = 600.0
+
+[[run]]
+name = "128r-2pair-25hints-xor-cms"
+rounds = 128
+num_pairs = 2
+hint_bits = 25
+encoder = "xor"
+solver = "cryptominisat"
+timeout_s = 1800.0
+
+[[run]]
+name = "160r-2pair-25hints-xor-cms-LEGACY-BASELINE"
+rounds = 160
+num_pairs = 2
+hint_bits = 25
+encoder = "xor"
+solver = "cryptominisat"
+timeout_s = 54000.0
