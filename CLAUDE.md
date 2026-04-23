@@ -57,10 +57,25 @@ The core nonlinear function is shared across cipher, ANF generator, and GPU ciph
 
 On the CLI these are `--diff-pair` and `--sat-pair` respectively (both repeatable). Conflating them is a category error; early drafts of the test suite hit this and the fix was to split the API.
 
-**Checkpoint policy.** `checkpoints/` is not committed by default. Produce a checkpoint with:
+**Checkpoint policy.** Large binary checkpoints are *not* committed to this git repo (they would bloat clones). Instead they are:
 
+1. Committed to the git repo anyway when small (d64.pt is 11.8 MB — fine). Whether to commit larger checkpoints is a case-by-case call; the HF mirror is always authoritative.
+2. Mirrored to Hugging Face at [`cahlen/keeloq-neural-distinguishers`](https://huggingface.co/cahlen/keeloq-neural-distinguishers) with a model card covering training config, eval metrics, architecture, and attack procedure.
+
+**When you produce a new checkpoint**, update both locations:
+
+    # Train
     uv run keeloq neural auto --rounds 64 --trained-depth 56 \
         --samples 10000000 --pairs 512 --checkpoint-out checkpoints/d64.pt
+
+    # Evaluate (appends to the per-depth JSON report)
+    uv run keeloq neural evaluate --checkpoint checkpoints/d64.pt \
+        --rounds 56 --samples 1000000 --seed 4242 \
+        > docs/phase3b-results/eval_d64.json
+
+    # Upload to HF (update the README.md table in the HF repo with the new metrics)
+    hf upload cahlen/keeloq-neural-distinguishers checkpoints/d64.pt d64.pt \
+        --commit-message "d64.pt: <summary of result>"
 
 The regression test `tests/test_neural_e2e_64r.py` auto-skips when `checkpoints/d64.pt` is absent. The benchmark runner (`benchmarks/bench_neural.py`) reports `SKIP_MISSING_CHECKPOINT` rather than crashing on missing checkpoints — it's smoke-safe.
 

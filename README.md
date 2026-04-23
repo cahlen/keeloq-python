@@ -50,7 +50,12 @@ End-to-end, one command (Δ search + train + attack a synthetic target):
         --samples 10000000 --pairs 512 \
         --checkpoint-out checkpoints/d64.pt
 
-~30 minutes training time on an RTX 5090. Afterwards, attack any new ciphertext under the same key:
+~60 minutes training time on an RTX 5090. Or skip training and pull a published checkpoint from Hugging Face:
+
+    mkdir -p checkpoints
+    hf download cahlen/keeloq-neural-distinguishers d64.pt --local-dir checkpoints/
+
+Then attack any new ciphertext under the same key:
 
     uv run keeloq neural recover-key --checkpoint checkpoints/d64.pt \
         --rounds 64 --diff-pair "<c0>:<c1>" --sat-pair "<pt>:<ct>" \
@@ -63,6 +68,18 @@ A ResNet-1D-CNN distinguisher is trained at a fixed depth **D** (e.g. 56) to sep
 **Two pair streams.** `--diff-pair` carries differential ciphertext pairs `(c₀, c₁)` — both ciphertexts, consumed by the neural distinguisher. `--sat-pair` carries known `plaintext:ciphertext` — consumed by the SAT solver. These are distinct because a differential attack doesn't need known plaintexts; only the SAT phase does.
 
 **Key-schedule constraint.** KeeLoq's key cycles every 64 rounds; at fewer than 64 rounds, bits `K_rounds..K_63` are never referenced and can't be recovered without being hinted. Attacks below 64 rounds therefore auto-populate `extra_key_hints` for the unconstrained range — handled automatically by `keeloq neural auto`.
+
+### Pre-trained distinguishers on Hugging Face
+
+Checkpoints are published at [**cahlen/keeloq-neural-distinguishers**](https://huggingface.co/cahlen/keeloq-neural-distinguishers) with a full model card covering training config, eval metrics, architecture, and attack procedure. Current availability:
+
+| File | Trained Depth | Attack Target | Val Accuracy | ROC-AUC |
+|---|---:|---:|---:|---:|
+| `d64.pt` | 56 | 64 rounds | 0.752 | 0.828 |
+| `d96.pt` | 88 | 96 rounds | (coming) | (coming) |
+| `d128.pt` | 120 | 128 rounds | (coming) | (coming) |
+
+Each `.pt` file embeds its full `TrainingConfig`, so results are reproducible from seed alone.
 
 ## Pipeline composition via Unix pipes
 
