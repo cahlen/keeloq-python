@@ -127,3 +127,46 @@ def test_attack_exit_code_on_unsat() -> None:
          "--encoder", "cnf", "--solver", "cryptominisat", "--timeout", "10", *hint_args],
     )
     assert result.exit_code == 3, f"expected exit 3 (UNSAT), got {result.exit_code}\n{result.stdout}"
+
+
+def test_pipeline_composition_via_stdout_to_stdin() -> None:
+    """generate-anf | encode | solve | verify returns the correct key."""
+    import json
+
+    key_int = 0x0123_4567_89AB_CDEF
+    pt = 0xAAAA5555
+    ct = encrypt(pt, key_int, 32)
+    pair = f"{int_to_bits(pt, 32)}:{int_to_bits(ct, 32)}"
+
+    # Step 1: generate-anf
+    anf_res = runner.invoke(
+        app,
+        ["generate-anf", "--rounds", "32", "--pair", pair,
+         "--hint-bits", "32", "--original-key", int_to_bits(key_int, 64)],
+    )
+    assert anf_res.exit_code == 0, anf_res.stdout
+    anf_json = anf_res.stdout
+
+    # Step 2: encode
+    enc_res = runner.invoke(app, ["encode", "--encoder", "xor"], input=anf_json)
+    assert enc_res.exit_code == 0, enc_res.stdout
+    instance_json = enc_res.stdout
+
+    # Step 3: solve
+    solve_res = runner.invoke(app, ["solve", "--solver", "cryptominisat",
+                                      "--timeout", "30"],
+                              input=instance_json)
+    assert solve_res.exit_code == 0, solve_res.stdout
+    result_json = solve_res.stdout
+    parsed = json.loads(result_json)
+    assert parsed["status"] == "SAT"
+
+    # Step 4: verify
+    vf_res = runner.invoke(
+        app,
+        ["verify", "--rounds", "32", "--pair", pair,
+         "--original-key", int_to_bits(key_int, 64)],
+        input=result_json,
+    )
+    assert vf_res.exit_code == 0
+    assert "match: true" in vf_res.stdout.lower()
